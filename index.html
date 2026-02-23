@@ -3,31 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite App - Pro Arena</title>
+    <title>Elite App - Gaming Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
+
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
         body { font-family: 'Inter', sans-serif; background-color: #05050a; color: white; overflow-x: hidden; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .animate-in { animation: fadeIn 0.3s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
-        input::placeholder { color: rgba(255,255,255,0.2); }
+        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        input::placeholder { color: rgba(255,255,255,0.2); font-style: italic; }
     </style>
 </head>
 <body>
+
     <div id="app">
-        <div class="h-screen flex items-center justify-center text-orange-600 font-black italic tracking-widest animate-pulse">
+        <div id="loader" class="h-screen flex items-center justify-center text-orange-600 font-black italic tracking-widest animate-pulse">
             INITIALIZING ARENA...
         </div>
     </div>
 
     <script>
         // ==========================================
-        // CONFIGURATION (यहाँ अपनी Keys डालें)
+        // CONFIGURATION (अपनी Keys यहाँ बदलें)
         // ==========================================
         const firebaseConfig = {
   apiKey: "AIzaSyDPChNIAQz0gEmsuDFpACl0XvWm-DNcf2k",
@@ -39,34 +41,216 @@
   measurementId: "G-9HZY4280CY"
 };
 
-        const geminiApiKey = "YOUR_GEMINI_KEY"; 
+        const geminiApiKey = "YOUR_GEMINI_KEY";
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
         const appId = "ff-tournament-pro-final";
 
-        // Global App State
+        // Global State
         let state = {
-            user: null, userData: null, loading: true, view: 'login', activeTab: 'home',
-            matches: [], winners: [], notifications: [], chatMessages: [], payments: [],
-            appConfig: null, isDarkMode: true, isAdminUnlocked: false, isStaffUnlocked: false,
-            showJoinModal: false, selectedMatch: null, aiStrategyData: null, aiPredictData: null,
-            walletAction: null, globalAlert: null
+            user: null, userData: null, view: 'login', activeTab: 'home',
+            matches: [], chatMessages: [], winners: [], notifications: [],
+            isDarkMode: true, isAdminUnlocked: false, isStaffUnlocked: false
         };
 
-        // --- AUTH & DATA FLOW ---
+        // --- AUTH CHECK ---
         auth.onAuthStateChanged(user => {
-            state.loading = false;
             if (user) {
                 state.user = user;
                 state.view = 'app';
-                initDataListeners(user.uid);
+                startDataListeners(user.uid);
             } else {
                 state.view = 'login';
                 render();
             }
         });
 
+        async function handleRegister(e) {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            if (f.get('pass') !== f.get('confirmPass')) return alert("Passwords don't match!");
+            
+            try {
+                // Email provider required for password logic
+                const email = `${f.get('phone')}@elite.com`;
+                const res = await auth.createUserWithEmailAndPassword(email, f.get('pass'));
+                await db.collection('artifacts').doc(appId).collection('users').doc(res.user.uid).collection('profile').doc('data').set({
+                    username: f.get('phone'), balance: 100, role: 'user', uid: res.user.uid, 
+                    totalWins: 0, joinedMatches: [], inviteCode: f.get('invite')
+                });
+            } catch (err) { alert(err.message); }
+        }
+
+        async function handleLogin(e) {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            try {
+                await auth.signInWithEmailAndPassword(`${f.get('phone')}@elite.com`, f.get('pass'));
+            } catch (err) { alert("Login Error: Make sure number/pass is correct."); }
+        }
+
+        function startDataListeners(uid) {
+            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data')
+                .onSnapshot(doc => { if(doc.exists()) state.userData = doc.data(); render(); });
+            
+            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
+                .onSnapshot(snap => { state.matches = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); });
+
+            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat')
+                .onSnapshot(snap => { 
+                    state.chatMessages = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.timestamp - b.timestamp).slice(-50);
+                    render();
+                });
+        }
+
+        // --- UI RENDERING (ORIGINAL ELITE DARK STYLE) ---
+        function render() {
+            const root = document.getElementById('app');
+            if (state.view === 'login' || state.view === 'register') {
+                root.innerHTML = renderAuthView();
+            } else {
+                root.innerHTML = renderAppView();
+            }
+            lucide.createIcons();
+        }
+
+        function renderAuthView() {
+            const isLogin = state.view === 'login';
+            return `
+            <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in bg-[#05050a]">
+                <div class="w-20 h-20 bg-orange-600 rounded-[2.2rem] flex items-center justify-center mb-6 shadow-2xl rotate-12">
+                    <i data-lucide="gamepad-2" class="w-12 h-12 text-white"></i>
+                </div>
+                <h1 class="text-4xl font-black italic uppercase mb-2 text-orange-600">${isLogin ? 'ELITE LOGIN' : 'CREATE SQUAD'}</h1>
+                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-12 italic">Join the Arena</p>
+                
+                <form onsubmit="${isLogin ? 'handleLogin(event)' : 'handleRegister(event)'}" class="w-full max-w-sm space-y-4">
+                    <div class="relative">
+                        <i data-lucide="smartphone" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
+                        <input name="phone" type="tel" placeholder="Phone Number" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                    </div>
+                    <div class="relative">
+                        <i data-lucide="lock" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
+                        <input name="pass" type="password" placeholder="Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                    </div>
+                    ${!isLogin ? `
+                        <div class="relative">
+                            <i data-lucide="shield-check" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
+                            <input name="confirmPass" type="password" placeholder="Confirm Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        </div>
+                        <div class="relative">
+                            <i data-lucide="user-plus" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
+                            <input name="invite" type="text" placeholder="Invite code (Optional)" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        </div>
+                    ` : ''}
+                    <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs active:scale-95 shadow-xl shadow-orange-600/20 transition-all">
+                        ${isLogin ? 'ENTER ARENA' : 'JOIN SQUAD'}
+                    </button>
+                </form>
+                <button onclick="state.view='${isLogin ? 'register' : 'login'}'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">
+                    ${isLogin ? 'New Survivor? Register' : 'Already have account? Login'}
+                </button>
+            </div>`;
+        }
+
+        function renderAppView() {
+            return `
+            <div class="min-h-screen pb-32 bg-[#05050a] text-white">
+                <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
+                    <div class="flex items-center gap-2">
+                        <i data-lucide="zap" class="text-orange-600 w-5 h-5 fill-orange-600"></i>
+                        <h1 class="font-black italic text-lg uppercase tracking-tighter">ELITE APP</h1>
+                    </div>
+                    <div class="px-4 py-1.5 rounded-2xl flex items-center gap-2 text-xs font-black bg-white/5 border border-white/10 shadow-sm">
+                        <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹${state.userData?.balance || 0}
+                    </div>
+                </header>
+
+                <main class="pt-24 px-6 max-w-lg mx-auto">
+                    ${renderTabContent()}
+                </main>
+
+                <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl overflow-x-auto no-scrollbar">
+                    <button onclick="state.activeTab='home'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='home' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="trophy" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Home</span></button>
+                    <button onclick="state.activeTab='lobby'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='lobby' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="message-square" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Lobby</span></button>
+                    <button onclick="state.activeTab='match'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='match' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="gamepad-2" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Match</span></button>
+                    <button onclick="state.activeTab='settings'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='settings' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="settings" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Profile</span></button>
+                </nav>
+            </div>`;
+        }
+
+        function renderTabContent() {
+            if (state.activeTab === 'home') {
+                return `
+                <div class="space-y-8 animate-in">
+                    <div class="relative h-48 w-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 bg-black">
+                        <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800" class="w-full h-full object-cover opacity-60" />
+                        <div class="absolute inset-0 bg-gradient-to-t from-black flex flex-col justify-end p-8">
+                            <h2 class="text-2xl font-black italic uppercase text-white tracking-tighter">Grand Scrims</h2>
+                            <p class="text-[10px] font-bold opacity-80 uppercase text-white italic">Elite Squads Only</p>
+                        </div>
+                    </div>
+                    <div class="space-y-4">
+                        <h4 class="font-black text-[10px] uppercase italic text-gray-500 tracking-widest flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-orange-500"></i> LIVE TOURNAMENTS</h4>
+                        ${state.matches.map(m => `
+                            <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] relative border-l-4 border-l-orange-600 shadow-xl backdrop-blur-md">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-[9px] font-black uppercase text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full">${m.map}</span>
+                                    <span class="text-[9px] text-gray-500 font-bold italic">${m.time}</span>
+                                </div>
+                                <h5 class="text-xl font-black italic uppercase">${m.title}</h5>
+                                <div class="mt-5 flex justify-between items-center">
+                                    <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Prize</p><p class="text-green-500 text-sm italic">₹${m.prizePool}</p></div>
+                                    <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg active:scale-95">JOIN ARENA</button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            }
+            if (state.activeTab === 'lobby') {
+                return `
+                <div class="h-[70vh] flex flex-col animate-in">
+                    <h2 class="text-2xl font-black italic uppercase flex items-center gap-2 mb-4"><i data-lucide="message-square" class="text-orange-500"></i> GLOBAL LOBBY</h2>
+                    <div class="flex-1 bg-black/40 border border-white/5 rounded-[2.5rem] p-4 flex flex-col overflow-hidden relative backdrop-blur-xl">
+                        <div class="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4 px-2">
+                            ${state.chatMessages.map(msg => `
+                                <div class="flex items-end gap-3 ${msg.uid === state.user?.uid ? 'flex-row-reverse' : ''}">
+                                    <div class="max-w-[75%] p-3 rounded-2xl ${msg.uid === state.user?.uid ? 'bg-orange-600 text-white rounded-br-sm' : 'bg-white/10 text-gray-200 rounded-bl-sm border border-white/5'}">
+                                        <p class="text-[8px] font-black uppercase text-orange-400 mb-1 italic">${msg.username}</p>
+                                        <p class="text-xs font-medium">${msg.text}</p>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>`;
+            }
+            if (state.activeTab === 'settings') {
+                return `
+                <div class="space-y-6 animate-in pb-12 text-center">
+                    <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-6 shadow-2xl backdrop-blur-md">
+                        <div class="w-32 h-32 rounded-[2.8rem] bg-orange-600/20 mx-auto flex items-center justify-center border-4 border-orange-600/30 shadow-2xl">
+                            <i data-lucide="user" class="w-16 h-16 text-orange-500"></i>
+                        </div>
+                        <h4 class="font-black text-2xl italic uppercase text-orange-500">@${state.userData?.username || 'GAMER'}</h4>
+                        <div class="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
+                            <div class="flex items-center justify-between">
+                                <h5 class="font-black text-[10px] uppercase italic text-gray-400">WALLET</h5>
+                                <span class="text-2xl font-black text-green-500 italic">₹${state.userData?.balance || 0}</span>
+                            </div>
+                        </div>
+                        <button onclick="auth.signOut()" class="w-full bg-red-600/10 border border-red-600/20 text-red-500 py-6 rounded-2xl font-black uppercase text-[10px] italic shadow-xl transition-all active:scale-95">TERMINATE SESSION</button>
+                    </div>
+                </div>`;
+            }
+            return `<div class="py-20 text-center text-gray-600 font-black italic">ARENA UNDER CONSTRUCTION...</div>`;
+        }
+
+    </script>
+</body>
+</html>
         function initDataListeners(uid) {
             // Profile
             db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data')
