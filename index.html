@@ -3,177 +3,124 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Arena Pro - Full Feature</title>
+    <title>Elite Pro Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #05050a; color: white; }
-        .glass { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        .custom-scrollbar::-webkit-scrollbar { width: 0px; }
+        @keyframes swing {
+            0%, 100% { transform: rotate(-10deg); }
+            50% { transform: rotate(10deg); }
+        }
+        .animate-swing { animation: swing 2s ease-in-out infinite; }
+        .glass-nav { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
         .orange-glow { box-shadow: 0 0 20px rgba(234, 88, 12, 0.2); }
-        .hide-scrollbar::-webkit-scrollbar { display: none; }
-        input:focus { border-color: #ea580c !important; }
-        .tab-active { color: #ea580c; transform: scale(1.1); }
-        .animate-slide-up { animation: slideUp 0.4s ease-out; }
-        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body class="pb-32 selection:bg-orange-600/30">
+<body class="bg-[#05050a] text-white">
 
-    <!-- Loading Screen -->
-    <div id="loading-screen" class="fixed inset-0 z-[200] bg-[#05050a] flex items-center justify-center">
-        <div class="text-center">
-            <i data-lucide="zap" class="w-12 h-12 text-orange-600 animate-bounce mx-auto"></i>
-            <p class="font-black italic text-orange-600 animate-pulse mt-4">ELITE ARENA...</p>
+    <!-- Recaptcha Container (Hidden) -->
+    <div id="recaptcha-container"></div>
+
+    <!-- App Container -->
+    <div id="app" class="min-h-screen flex flex-col">
+        <!-- Loading Screen -->
+        <div id="loader" class="fixed inset-0 bg-[#05050a] z-[1000] flex flex-col items-center justify-center space-y-4">
+            <div class="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+            <div class="text-orange-600 font-black italic tracking-widest animate-pulse uppercase">Elite Arena...</div>
         </div>
+
+        <!-- Toast Notification -->
+        <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[1000] px-6 py-4 rounded-full bg-orange-600 text-white font-black italic text-xs hidden animate-bounce uppercase"></div>
+
+        <!-- Auth Section -->
+        <div id="auth-section" class="hidden min-h-screen flex flex-col items-center justify-center p-8">
+            <div class="w-full max-w-sm space-y-8">
+                <div class="text-center">
+                    <div class="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-600/30">
+                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                    </div>
+                    <h1 class="text-4xl font-black italic uppercase tracking-tighter">Elite Login</h1>
+                    <p class="text-gray-500 text-sm mt-2">Enter the arena of champions</p>
+                </div>
+
+                <div id="phone-form" class="space-y-4">
+                    <div class="relative">
+                        <input id="phone-input" type="tel" placeholder="Mobile Number" maxLength="10" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-6 outline-none font-bold focus:border-orange-600/50 transition-all">
+                    </div>
+                    <button onclick="sendOtp()" id="send-btn" class="w-full bg-orange-600 hover:bg-orange-700 py-5 rounded-2xl font-black shadow-lg shadow-orange-600/20 uppercase tracking-widest transition-all">Get OTP</button>
+                </div>
+
+                <div id="otp-form" class="hidden space-y-4">
+                    <input id="otp-input" type="text" placeholder="0 0 0 0 0 0" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-center text-2xl tracking-[0.5em] font-black outline-none focus:border-orange-600/50">
+                    <button onclick="verifyOtp()" id="verify-btn" class="w-full bg-orange-600 hover:bg-orange-700 py-5 rounded-2xl font-black shadow-lg shadow-orange-600/20 uppercase tracking-widest">Verify & Enter</button>
+                    <button onclick="resetAuth()" class="w-full text-gray-500 text-sm font-bold">Try Different Number</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Content (Hidden initially) -->
+        <div id="main-content" class="hidden flex-1 pb-32">
+            <!-- Header -->
+            <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
+                <div class="flex items-center gap-2">
+                    <div class="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                    </div>
+                    <h1 class="font-black italic text-lg uppercase tracking-tighter">Elite <span class="text-orange-600">Pro</span></h1>
+                </div>
+                <div class="flex items-center gap-3">
+                    <div class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs font-black">
+                        <span class="text-green-500 font-bold">₹</span> <span id="header-balance">0</span>
+                    </div>
+                    <div class="w-8 h-8 rounded-full border border-orange-600/30 overflow-hidden" id="header-avatar"></div>
+                </div>
+            </header>
+
+            <!-- Global Alert -->
+            <div id="global-alert-container" class="pt-20 px-6 hidden">
+                <div class="bg-orange-600/10 border border-orange-600/20 p-4 rounded-2xl flex items-center gap-3">
+                    <div class="animate-swing"><svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
+                    <p id="global-alert-text" class="text-xs font-bold text-orange-200 truncate"></p>
+                </div>
+            </div>
+
+            <main id="tab-container" class="max-w-xl mx-auto px-6 pt-24"></main>
+        </div>
+
+        <!-- Navigation -->
+        <nav id="navbar" class="hidden fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl">
+            <button onclick="setTab('home')" class="nav-item flex flex-col items-center gap-1.5 px-6 transition-all duration-300 text-orange-500 scale-110" id="nav-home">
+                <div class="p-1 rounded-xl bg-orange-600/10">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </div>
+                <span class="text-[9px] font-black uppercase italic tracking-widest">Warzone</span>
+            </button>
+            <button onclick="setTab('lobby')" class="nav-item flex flex-col items-center gap-1.5 px-6 transition-all duration-300 text-gray-500 opacity-60" id="nav-lobby">
+                <div class="p-1 rounded-xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </div>
+                <span class="text-[9px] font-black uppercase italic tracking-widest">Lobby</span>
+            </button>
+            <button onclick="setTab('profile')" class="nav-item flex flex-col items-center gap-1.5 px-6 transition-all duration-300 text-gray-500 opacity-60" id="nav-profile">
+                <div class="p-1 rounded-xl">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
+                </div>
+                <span class="text-[9px] font-black uppercase italic tracking-widest">Arsenal</span>
+            </button>
+        </nav>
+
+        <!-- Modals Container -->
+        <div id="modal-container"></div>
     </div>
 
-    <!-- Toast -->
-    <div id="toast-container" class="fixed top-10 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"></div>
-
-    <!-- Header -->
-    <header class="fixed top-0 inset-x-0 h-16 glass flex items-center justify-between px-6 z-50">
-        <h1 class="font-black italic text-lg uppercase text-orange-600 tracking-tighter">ELITE PRO</h1>
-        <div id="wallet-display" class="px-4 py-1.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2 text-xs font-black">
-            <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹<span id="user-balance">0</span>
-        </div>
-    </header>
-
-    <!-- Global Alert (Jo original React file mein tha) -->
-    <div id="global-alert-container" class="fixed top-20 inset-x-6 z-40 hidden">
-        <div class="bg-orange-600 text-white p-3 rounded-2xl flex items-center gap-3 shadow-2xl animate-bounce">
-            <i data-lucide="bell" class="w-4 h-4"></i>
-            <p id="alert-text" class="text-[10px] font-bold uppercase"></p>
-        </div>
-    </div>
-
-    <!-- Main Screens -->
-    <main id="app-screens" class="pt-24 px-6 max-w-lg mx-auto">
-        
-        <!-- Login Screen (Visible when !user) -->
-        <div id="screen-auth" class="min-h-[70vh] flex flex-col items-center justify-center text-center space-y-8 hidden">
-            <div id="recaptcha-container"></div>
-            <i data-lucide="zap" class="w-16 h-16 text-orange-600 mx-auto"></i>
-            <h2 class="text-4xl font-black italic uppercase">Elite Login</h2>
-            
-            <div id="auth-step-1" class="w-full space-y-4">
-                <input id="auth-phone" type="tel" placeholder="Mobile Number" maxlength="10" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold">
-                <button onclick="sendOTP()" id="btn-otp" class="w-full bg-orange-600 py-5 rounded-2xl font-black">GET OTP</button>
-            </div>
-
-            <div id="auth-step-2" class="w-full space-y-4 hidden">
-                <input id="auth-otp" type="text" placeholder="6-Digit OTP" maxlength="6" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-center tracking-[1em] outline-none font-bold">
-                <button onclick="verifyOTP()" id="btn-verify" class="w-full bg-orange-600 py-5 rounded-2xl font-black">VERIFY</button>
-            </div>
-        </div>
-
-        <!-- Home: Matches -->
-        <div id="screen-home" class="space-y-6 animate-slide-up">
-            <div id="match-list" class="space-y-6">
-                <!-- Matches Inject Here -->
-            </div>
-        </div>
-
-        <!-- Lobby: Chat -->
-        <div id="screen-lobby" class="hidden space-y-4 h-[70vh] flex flex-col animate-slide-up">
-            <h2 class="text-2xl font-black italic uppercase">Global Lobby</h2>
-            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-2 hide-scrollbar">
-                <!-- Chat Inject Here -->
-            </div>
-            <div class="flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/10">
-                <input id="chat-input" placeholder="Type message..." class="bg-transparent flex-1 outline-none px-2 font-bold text-sm">
-                <button onclick="sendChatMessage()" class="bg-orange-600 p-3 rounded-xl">
-                    <i data-lucide="send" class="w-4 h-4"></i>
-                </button>
-            </div>
-        </div>
-
-        <!-- Settings: Profile -->
-        <div id="screen-settings" class="hidden space-y-6 animate-slide-up pb-12">
-            <h2 id="admin-trigger" class="text-2xl font-black italic uppercase flex items-center gap-2 cursor-pointer">
-                <i data-lucide="settings" class="text-orange-500"></i> PROFILE
-            </h2>
-            <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 text-center space-y-4 orange-glow">
-                <div class="relative w-32 h-32 mx-auto">
-                    <img id="profile-pic" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=200" class="w-32 h-32 rounded-3xl border-4 border-orange-600/20 object-cover" alt="P">
-                    <div class="absolute -bottom-2 -right-2 bg-orange-600 px-2 py-1 rounded-lg text-[10px] font-black">PRO</div>
-                </div>
-                <h4 id="profile-name" class="font-black text-2xl text-orange-500 uppercase italic">@GAMER</h4>
-                <div class="grid grid-cols-2 gap-2 text-[10px] font-black uppercase">
-                    <div class="bg-white/5 p-3 rounded-xl border border-white/5">
-                        <p class="text-gray-500">Level</p>
-                        <p id="profile-level" class="text-white">1</p>
-                    </div>
-                    <div class="bg-white/5 p-3 rounded-xl border border-white/5">
-                        <p class="text-gray-500">XP</p>
-                        <p id="profile-xp" class="text-white">10</p>
-                    </div>
-                </div>
-                <div class="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center">
-                    <div class="text-left">
-                        <p class="text-[8px] text-gray-500 font-bold">REFERRAL CODE</p>
-                        <p id="ref-code" class="text-sm font-black text-orange-500 tracking-widest">---</p>
-                    </div>
-                    <button onclick="copyReferral()" class="p-2 bg-orange-600/20 text-orange-500 rounded-lg">
-                        <i data-lucide="copy" class="w-4 h-4"></i>
-                    </button>
-                </div>
-                <button onclick="handleLogout()" class="w-full bg-red-600/10 text-red-500 py-4 rounded-2xl font-black border border-red-600/20">LOGOUT</button>
-            </div>
-        </div>
-    </main>
-
-    <!-- Navigation -->
-    <nav id="bottom-nav" class="fixed bottom-6 inset-x-6 h-20 glass rounded-[2.5rem] flex items-center justify-around px-3 z-50 hidden">
-        <button onclick="switchTab('home')" id="nav-home" class="nav-btn flex flex-col items-center gap-1 tab-active">
-            <i data-lucide="trophy" class="w-6 h-6"></i>
-            <span class="text-[8px] font-black uppercase italic">Home</span>
-        </button>
-        <button onclick="switchTab('lobby')" id="nav-lobby" class="nav-btn flex flex-col items-center gap-1 text-gray-500">
-            <i data-lucide="message-square" class="w-6 h-6"></i>
-            <span class="text-[8px] font-black uppercase italic">Lobby</span>
-        </button>
-        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center gap-1 text-gray-500">
-            <i data-lucide="settings" class="w-6 h-6"></i>
-            <span class="text-[8px] font-black uppercase italic">Profile</span>
-        </button>
-    </nav>
-
-    <!-- Modals -->
-    <div id="modal-overlay" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-8 hidden">
-        <!-- Join Modal -->
-        <div id="modal-join" class="bg-[#0c0c0c] border border-orange-600/20 p-8 rounded-[3rem] w-full max-w-sm space-y-6 hidden animate-slide-up">
-            <div class="text-center">
-                <h3 id="join-title" class="text-xl font-black italic uppercase">MATCH NAME</h3>
-                <p id="join-fee" class="text-xs text-orange-500 font-bold">FEE: ₹0</p>
-            </div>
-            <div class="space-y-4">
-                <input id="join-ign" placeholder="In-Game Name (IGN)" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none font-bold">
-                <input id="join-uid" placeholder="Game UID" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none font-bold">
-            </div>
-            <button onclick="confirmJoin()" id="btn-join-final" class="w-full bg-orange-600 py-4 rounded-xl font-black text-white">CONFIRM JOIN</button>
-            <button onclick="closeModals()" class="w-full text-gray-500 font-bold text-xs uppercase">Back</button>
-        </div>
-        
-        <!-- Admin Modal (Secret) -->
-        <div id="modal-admin" class="bg-[#0c0c0c] border border-green-600/20 p-8 rounded-[3rem] w-full max-w-sm space-y-4 hidden">
-            <h3 class="text-xl font-black italic text-green-500">ADMIN UNLOCKED</h3>
-            <div class="space-y-2">
-                <button onclick="adminAction('create')" class="w-full bg-white/5 p-3 rounded-xl text-left font-bold text-xs uppercase">+ Create Match</button>
-                <button onclick="adminAction('alert')" class="w-full bg-white/5 p-3 rounded-xl text-left font-bold text-xs uppercase">Send Global Alert</button>
-            </div>
-            <button onclick="closeModals()" class="w-full text-gray-500 font-bold text-xs">Close</button>
-        </div>
-    </div>
-
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, onAuthStateChanged, signInWithPhoneNumber, RecaptchaVerifier, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
-
-        // CONFIG (Replace with your actual Firebase config)
+    <script>
+        // --- Firebase Initialization ---
         const firebaseConfig = {
   apiKey: "AIzaSyDPChNIAQz0gEmsuDFpACl0XvWm-DNcf2k",
   authDomain: "eliteweb-5b512.firebaseapp.com",
@@ -183,240 +130,389 @@
   appId: "1:474751993215:web:88be5ffccdd88651cf464a",
   measurementId: "G-9HZY4280CY"
 };
+        };
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+        const appId = 'elite_arena_v2';
 
-        const app = initializeApp(firebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
-        const functions = getFunctions(app);
-        const appId = "elite_pro_final_v3";
-
-        // Global State
-        let user = null;
+        // --- Global State ---
+        let currentUser = null;
         let userData = null;
-        let confirmationResult = null;
-        let selectedMatch = null;
+        let activeTab = 'home';
+        let matches = [];
+        let chatMessages = [];
+        let globalAlert = null;
         let adminTapCount = 0;
+        let confirmationResult = null;
 
-        // AUTH LOGIC
-        window.sendOTP = async () => {
-            const phone = document.getElementById('auth-phone').value;
-            if(phone.length < 10) return showToast("Invalid Number", "error");
-            
-            loadingBtn('btn-otp', true);
-            if(!window.recaptchaVerifier) {
-                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
+        // --- UI Utilities ---
+        function showMessage(msg, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.classList.remove('hidden', 'bg-orange-600', 'bg-red-600');
+            toast.classList.add(type === 'error' ? 'bg-red-600' : 'bg-orange-600');
+            setTimeout(() => toast.classList.add('hidden'), 3000);
+        }
+
+        function setLoader(show) {
+            document.getElementById('loader').classList.toggle('hidden', !show);
+        }
+
+        // --- Auth Functions ---
+        function setupRecaptcha() {
+            if (!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                    'size': 'invisible'
+                });
             }
+        }
 
+        async function sendOtp() {
+            const phone = document.getElementById('phone-input').value;
+            if (phone.length < 10) return showMessage("Invalid Number", "error");
+            setupRecaptcha();
+            setLoader(true);
             try {
-                confirmationResult = await signInWithPhoneNumber(auth, `+91${phone}`, window.recaptchaVerifier);
-                document.getElementById('auth-step-1').classList.add('hidden');
-                document.getElementById('auth-step-2').classList.remove('hidden');
-                showToast("OTP Sent!");
+                confirmationResult = await auth.signInWithPhoneNumber(`+91${phone}`, window.recaptchaVerifier);
+                document.getElementById('phone-form').classList.add('hidden');
+                document.getElementById('otp-form').classList.remove('hidden');
+                showMessage("OTP Sent!");
             } catch (err) {
-                showToast("Error sending SMS", "error");
-            } finally { loadingBtn('btn-otp', false, "GET OTP"); }
-        };
-
-        window.verifyOTP = async () => {
-            const otp = document.getElementById('auth-otp').value;
-            loadingBtn('btn-verify', true);
-            try {
-                await confirmationResult.confirm(otp);
-                showToast("Verified!");
-            } catch (err) {
-                showToast("Invalid OTP", "error");
-            } finally { loadingBtn('btn-verify', false, "VERIFY"); }
-        };
-
-        window.handleLogout = () => signOut(auth).then(() => showToast("Logged Out"));
-
-        // REAL-TIME SYNC
-        onAuthStateChanged(auth, (u) => {
-            user = u;
-            document.getElementById('loading-screen').classList.add('hidden');
-            
-            if(user) {
-                document.getElementById('screen-auth').classList.add('hidden');
-                document.getElementById('bottom-nav').classList.remove('hidden');
-                syncProfile();
-                syncMatches();
-                syncChat();
-                syncAlerts();
-            } else {
-                document.getElementById('screen-auth').classList.remove('hidden');
-                document.getElementById('bottom-nav').classList.add('hidden');
+                showMessage("Failed to send SMS", "error");
+                console.error(err);
             }
-        });
+            setLoader(false);
+        }
 
-        const syncProfile = () => {
-            const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
-            onSnapshot(profileRef, (ds) => {
-                if(ds.exists()) {
-                    userData = ds.data();
-                    updateProfileUI();
+        async function verifyOtp() {
+            const otp = document.getElementById('otp-input').value;
+            setLoader(true);
+            try {
+                const result = await confirmationResult.confirm(otp);
+                const user = result.user;
+                const profileRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('profile').doc('data');
+                const snap = await profileRef.get();
+                if (!snap.exists()) {
+                    await profileRef.set({
+                        username: `Player_${user.uid.slice(0, 5)}`,
+                        balance: 50,
+                        uid: user.uid,
+                        phone: user.phoneNumber,
+                        totalWins: 0,
+                        joinedMatches: [],
+                        xp: 10,
+                        role: 'user'
+                    });
+                }
+            } catch (err) {
+                showMessage("Invalid OTP", "error");
+            }
+            setLoader(false);
+        }
+
+        function resetAuth() {
+            document.getElementById('phone-form').classList.remove('hidden');
+            document.getElementById('otp-form').classList.add('hidden');
+        }
+
+        // --- Tab Management ---
+        function setTab(tab) {
+            activeTab = tab;
+            // Update UI Icons
+            ['home', 'lobby', 'profile'].forEach(t => {
+                const navBtn = document.getElementById(`nav-${t}`);
+                if (t === tab) {
+                    navBtn.classList.remove('text-gray-500', 'opacity-60');
+                    navBtn.classList.add('text-orange-500', 'scale-110');
+                    navBtn.querySelector('div').classList.add('bg-orange-600/10');
+                } else {
+                    navBtn.classList.add('text-gray-500', 'opacity-60');
+                    navBtn.classList.remove('text-orange-500', 'scale-110');
+                    navBtn.querySelector('div').classList.remove('bg-orange-600/10');
                 }
             });
-        };
+            render();
+        }
 
-        const syncMatches = () => {
-            const matchesRef = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
-            onSnapshot(matchesRef, (snap) => {
-                const list = document.getElementById('match-list');
-                const matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                list.innerHTML = matches.map(m => `
-                    <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem] border-l-4 border-l-orange-600 relative overflow-hidden group">
-                        <div class="flex justify-between items-start">
-                            <div>
-                                <h5 class="text-xl font-black italic uppercase leading-tight">${m.title}</h5>
-                                <p class="text-[10px] font-bold text-gray-500 uppercase mt-1">Map: ${m.map || 'Bermuda'} | Mode: ${m.mode || 'Solo'}</p>
-                            </div>
-                            <div class="bg-green-600/20 text-green-500 px-3 py-1 rounded-xl text-[10px] font-black italic">₹${m.prizePool} PRIZE</div>
+        // --- Render Core ---
+        function render() {
+            const container = document.getElementById('tab-container');
+            container.innerHTML = '';
+
+            if (activeTab === 'home') {
+                let html = `<div class="space-y-6">
+                    <div class="flex items-center justify-between">
+                        <h2 class="text-xl font-black italic uppercase">Tournaments</h2>
+                        <div class="flex gap-2">
+                            <div class="px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-gray-400">BGMI</div>
+                            <div class="px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-gray-400">FF</div>
                         </div>
-                        <div class="mt-6 flex justify-between items-end">
-                            <div class="flex flex-col gap-1">
-                                <span class="text-[8px] font-black text-gray-500 uppercase">ENTRY FEE: ₹${m.entryFee}</span>
-                                <div class="flex items-center gap-2">
-                                    <div class="w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
-                                        <div class="h-full bg-orange-600" style="width: ${(m.joinedCount/m.maxPlayers)*100}%"></div>
+                    </div>`;
+                
+                if (matches.length === 0) {
+                    html += `<div class="py-20 text-center opacity-50"><p class="font-bold">No Active Matches</p></div>`;
+                } else {
+                    matches.forEach(m => {
+                        html += `
+                        <div class="relative bg-white/5 border border-white/10 overflow-hidden rounded-[2.5rem]">
+                            <div class="absolute top-0 right-0 px-6 py-2 bg-orange-600 text-[10px] font-black italic uppercase rounded-bl-[1.5rem]">${m.type || 'SOLO'}</div>
+                            <div class="p-8">
+                                <h3 class="text-2xl font-black italic uppercase mb-2">${m.title}</h3>
+                                <div class="grid grid-cols-2 gap-4 mt-6">
+                                    <div class="bg-black/40 p-3 rounded-2xl border border-white/5">
+                                        <p class="text-[10px] text-gray-500 font-black">PRIZE</p>
+                                        <p class="text-lg font-black text-green-500">₹${m.prizePool}</p>
                                     </div>
-                                    <span class="text-[9px] font-black">${m.joinedCount}/${m.maxPlayers}</span>
+                                    <div class="bg-black/40 p-3 rounded-2xl border border-white/5">
+                                        <p class="text-[10px] text-gray-500 font-black">ENTRY</p>
+                                        <p class="text-lg font-black text-orange-500">₹${m.entryFee}</p>
+                                    </div>
                                 </div>
+                                <button onclick="openJoinModal('${m.id}')" class="w-full mt-8 bg-orange-600 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-orange-600/20">Register Now</button>
                             </div>
-                            <button onclick="openJoinModal('${m.id}', '${m.title}', ${m.entryFee})" class="px-8 py-2.5 bg-orange-600 rounded-xl text-xs font-black italic shadow-lg shadow-orange-600/20 active:scale-90 transition-all">JOIN</button>
+                        </div>`;
+                    });
+                }
+                html += `</div>`;
+                container.innerHTML = html;
+
+            } else if (activeTab === 'lobby') {
+                let html = `<div class="h-[calc(100vh-250px)] flex flex-col">
+                    <div class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar" id="chat-messages">`;
+                chatMessages.forEach(msg => {
+                    const isMe = msg.uid === currentUser.uid;
+                    html += `
+                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                        <span class="text-[10px] text-gray-500 mb-1 font-bold uppercase">${msg.username}</span>
+                        <div class="max-w-[80%] px-4 py-3 rounded-2xl text-sm font-medium ${isMe ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/10 text-white rounded-tl-none border border-white/5'}">
+                            ${msg.text}
+                        </div>
+                    </div>`;
+                });
+                html += `</div>
+                    <form onsubmit="event.preventDefault(); sendChatMsg()" class="mt-4 flex gap-2">
+                        <input id="chat-input" placeholder="Type message..." class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 outline-none font-bold text-sm">
+                        <button type="submit" class="bg-orange-600 p-4 rounded-2xl"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
+                    </form>
+                </div>`;
+                container.innerHTML = html;
+                const chatBox = document.getElementById('chat-messages');
+                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
+
+            } else if (activeTab === 'profile') {
+                container.innerHTML = `
+                <div class="space-y-6">
+                    <div class="text-center py-8">
+                        <div class="w-32 h-32 mx-auto relative">
+                            <div class="absolute inset-0 bg-orange-600 rounded-[2.5rem] blur-2xl opacity-20"></div>
+                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}" class="w-32 h-32 rounded-[2.5rem] border-4 border-orange-600/20 relative z-10">
+                        </div>
+                        <h2 onclick="handleAdminSecret()" class="mt-6 text-3xl font-black italic uppercase">${userData?.username || 'Gamer'}</h2>
+                        <p class="text-gray-500 text-sm font-bold mt-1">Level ${Math.floor((userData?.xp || 0) / 10)} Elite Warrior</p>
+                    </div>
+                    <div class="grid grid-cols-2 gap-4">
+                        <div class="bg-white/5 p-6 rounded-[2rem] text-center border border-white/10">
+                            <p class="text-[10px] text-gray-500 font-black">WINS</p>
+                            <p class="text-2xl font-black text-orange-500">${userData?.totalWins || 0}</p>
+                        </div>
+                        <div class="bg-white/5 p-6 rounded-[2rem] text-center border border-white/10">
+                            <p class="text-[10px] text-gray-500 font-black">JOINED</p>
+                            <p class="text-2xl font-black text-white">${userData?.joinedMatches?.length || 0}</p>
                         </div>
                     </div>
-                `).join('');
-            });
-        };
-
-        const syncChat = () => {
-            const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
-            onSnapshot(chatRef, (snap) => {
-                const container = document.getElementById('chat-messages');
-                const messages = snap.docs.map(d => d.data()).sort((a,b) => a.timestamp - b.timestamp).slice(-30);
-                container.innerHTML = messages.map(m => `
-                    <div class="bg-white/5 p-3 rounded-2xl border border-white/5 animate-slide-up">
-                        <p class="text-[8px] font-black text-orange-500 uppercase">${m.username}</p>
-                        <p class="text-xs font-medium text-gray-200 mt-1">${m.text}</p>
+                    <div class="space-y-2">
+                        <button onclick="showMessage('Pay Gate Coming Soon')" class="w-full flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-[2rem]">
+                            <span class="font-black italic uppercase text-sm tracking-widest">Add Funds</span>
+                            <span class="text-green-500 font-bold">RECHARGE</span>
+                        </button>
+                        <button onclick="auth.signOut()" class="w-full p-6 bg-red-600/5 border border-red-600/10 rounded-[2rem] text-red-500 font-black italic uppercase text-sm">Logout Session</button>
                     </div>
-                `).join('');
-                container.scrollTop = container.scrollHeight;
-            });
-        };
-
-        const syncAlerts = () => {
-            const alertsRef = collection(db, 'artifacts', appId, 'public', 'data', 'alerts');
-            onSnapshot(alertsRef, (snap) => {
-                const latest = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp)[0];
-                if(latest && latest.timestamp > Date.now() - 300000) {
-                    document.getElementById('global-alert-container').classList.remove('hidden');
-                    document.getElementById('alert-text').innerText = latest.msg;
-                    setTimeout(() => document.getElementById('global-alert-container').classList.add('hidden'), 5000);
-                }
-            });
-        };
-
-        // UI ACTIONS
-        window.switchTab = (tab) => {
-            document.querySelectorAll('#app-screens > div').forEach(d => d.classList.add('hidden'));
-            document.getElementById(`screen-${tab}`).classList.remove('hidden');
-            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('tab-active'));
-            document.getElementById(`nav-${tab}`).classList.add('tab-active');
-            lucide.createIcons();
-        };
-
-        const updateProfileUI = () => {
-            document.getElementById('user-balance').innerText = userData.balance || 0;
-            document.getElementById('profile-name').innerText = `@${userData.username}`;
-            document.getElementById('profile-xp').innerText = userData.xp || 0;
-            document.getElementById('profile-level').innerText = Math.floor((userData.xp || 0) / 10) + 1;
-            document.getElementById('ref-code').innerText = userData.referralCode || user.uid.slice(0,6).toUpperCase();
-        };
-
-        // SECRET ADMIN TRIGGER (Exactly like React file)
-        document.getElementById('admin-trigger').addEventListener('click', () => {
-            adminTapCount++;
-            if(adminTapCount >= 10) {
-                adminTapCount = 0;
-                showModal('modal-admin');
-                showToast("Admin Unlocked", "success");
+                </div>`;
             }
-        });
+        }
 
-        window.openJoinModal = (id, title, fee) => {
-            selectedMatch = { id, title, fee };
-            document.getElementById('join-title').innerText = title;
-            document.getElementById('join-fee').innerText = `FEE: ₹${fee}`;
-            showModal('modal-join');
-        };
+        // --- Core Logics ---
+        async function openJoinModal(matchId) {
+            const match = matches.find(m => m.id === matchId);
+            if (!match) return;
+            if (userData.balance < match.entryFee) return showMessage("Insufficient Balance", "error");
 
-        window.confirmJoin = async () => {
+            const modalHtml = `
+            <div id="join-modal" class="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-6 z-[100]">
+                <div class="bg-[#0c0c0c] border border-orange-600/20 p-8 rounded-[3rem] w-full max-w-sm">
+                    <h3 class="text-2xl font-black italic uppercase mb-6 text-center">Confirm Entry</h3>
+                    <form onsubmit="event.preventDefault(); confirmJoin('${matchId}')" class="space-y-4">
+                        <input id="join-ign" placeholder="In-Game Name (IGN)" required class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold">
+                        <input id="join-uid" placeholder="Character UID" required class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold">
+                        <button type="submit" class="w-full bg-orange-600 py-5 rounded-2xl font-black uppercase shadow-lg shadow-orange-600/20">Pay ₹${match.entryFee}</button>
+                        <button type="button" onclick="document.getElementById('join-modal').remove()" class="w-full text-gray-500 font-bold text-sm">Cancel</button>
+                    </form>
+                </div>
+            </div>`;
+            document.getElementById('modal-container').innerHTML = modalHtml;
+        }
+
+        async function confirmJoin(matchId) {
+            const match = matches.find(m => m.id === matchId);
             const ign = document.getElementById('join-ign').value;
-            const uid = document.getElementById('join-uid').value;
-            if(!ign || !uid) return showToast("Enter Details", "error");
+            const guid = document.getElementById('join-uid').value;
             
-            loadingBtn('btn-join-final', true);
+            setLoader(true);
             try {
-                // IMPORTANT: Production mein yahan HttpsCallable use karein
-                // Filhal functionality ke liye join function ko call karein (Logic same as React)
-                const joinFn = httpsCallable(functions, 'joinMatch');
-                const res = await joinFn({ appId, matchId: selectedMatch.id, ign, uid });
-                if(res.data.success) {
-                    showToast("Joined Successfully!");
-                    closeModals();
-                }
-            } catch (err) {
-                showToast(err.message || "Join Failed", "error");
-            } finally { loadingBtn('btn-join-final', false, "CONFIRM JOIN"); }
-        };
+                // Update Match
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches').doc(matchId).update({
+                    joinedCount: firebase.firestore.FieldValue.increment(1),
+                    participants: firebase.firestore.FieldValue.arrayUnion({ uid: currentUser.uid, gameName: ign, gameUID: guid, joinedAt: Date.now() })
+                });
 
-        window.sendChatMessage = async () => {
+                // Update Profile
+                await db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('profile').doc('data').update({
+                    balance: firebase.firestore.FieldValue.increment(-match.entryFee),
+                    joinedMatches: firebase.firestore.FieldValue.arrayUnion(matchId)
+                });
+
+                document.getElementById('join-modal').remove();
+                showMessage("Joined Tournament!");
+            } catch (err) {
+                showMessage("Join Failed", "error");
+            }
+            setLoader(false);
+        }
+
+        async function sendChatMsg() {
             const input = document.getElementById('chat-input');
             const text = input.value.trim();
-            if(!text) return;
-            input.value = '';
-            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chat'), {
-                username: userData?.username || "Gamer",
-                text,
+            if (!text) return;
+            try {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat').add({
+                    uid: currentUser.uid,
+                    username: userData.username,
+                    text: text,
+                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
+                });
+                input.value = '';
+            } catch (e) {}
+        }
+
+        function handleAdminSecret() {
+            adminTapCount++;
+            if (adminTapCount >= 10) {
+                openAdminPanel();
+                adminTapCount = 0;
+            }
+        }
+
+        function openAdminPanel() {
+            const modalHtml = `
+            <div id="admin-modal" class="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-[200]">
+                <div class="bg-[#0c0c0c] border border-orange-600 p-8 rounded-[3rem] w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar">
+                    <div class="flex items-center justify-between mb-8">
+                        <h2 class="text-2xl font-black italic uppercase text-orange-600">Admin Control</h2>
+                        <button onclick="document.getElementById('admin-modal').remove()"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round"></path></svg></button>
+                    </div>
+                    <form onsubmit="event.preventDefault(); createMatch(this)" class="space-y-4">
+                        <input name="title" placeholder="Match Title" required class="w-full bg-white/5 p-4 rounded-xl outline-none">
+                        <div class="grid grid-cols-2 gap-2">
+                            <input name="fee" type="number" placeholder="Fee" required class="w-full bg-white/5 p-4 rounded-xl">
+                            <input name="prize" type="number" placeholder="Prize" required class="w-full bg-white/5 p-4 rounded-xl">
+                        </div>
+                        <input name="type" placeholder="Type (SOLO/DUO)" class="w-full bg-white/5 p-4 rounded-xl">
+                        <button type="submit" class="w-full bg-orange-600 py-4 rounded-xl font-black">Launch Match</button>
+                    </form>
+                    <div class="mt-8 pt-8 border-t border-white/10">
+                        <input id="admin-alert" placeholder="New Alert Text" class="w-full bg-white/5 p-4 rounded-xl mb-2">
+                        <button onclick="updateGlobalAlert()" class="w-full bg-blue-600 py-4 rounded-xl font-black">Push Alert</button>
+                    </div>
+                </div>
+            </div>`;
+            document.getElementById('modal-container').innerHTML = modalHtml;
+        }
+
+        async function createMatch(form) {
+            const fd = new FormData(form);
+            setLoader(true);
+            try {
+                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches').add({
+                    title: fd.get('title'),
+                    entryFee: Number(fd.get('fee')),
+                    prizePool: Number(fd.get('prize')),
+                    type: fd.get('type'),
+                    joinedCount: 0,
+                    participants: [],
+                    time: 'ASAP'
+                });
+                showMessage("Match Launched!");
+                document.getElementById('admin-modal').remove();
+            } catch (e) { showMessage("Error", "error"); }
+            setLoader(false);
+        }
+
+        async function updateGlobalAlert() {
+            const text = document.getElementById('admin-alert').value;
+            if (!text) return;
+            await db.collection('artifacts').doc(appId).collection('public').doc('data').doc('globalAlert').set({
+                text: text,
                 timestamp: Date.now()
             });
-        };
+            showMessage("Alert Updated!");
+            document.getElementById('admin-modal').remove();
+        }
 
-        // UTILS
-        window.showToast = (msg, type = 'success') => {
-            const container = document.getElementById('toast-container');
-            const toast = document.createElement('div');
-            toast.className = `px-6 py-4 rounded-3xl shadow-2xl bg-orange-600 text-white font-black italic text-xs mb-3 animate-slide-up transition-all pointer-events-auto`;
-            toast.innerText = msg;
-            container.appendChild(toast);
-            setTimeout(() => {
-                toast.style.opacity = '0';
-                setTimeout(() => toast.remove(), 500);
-            }, 3000);
-        };
+        // --- Auth State Listener ---
+        auth.onAuthStateChanged(user => {
+            currentUser = user;
+            if (user) {
+                document.getElementById('auth-section').classList.add('hidden');
+                document.getElementById('main-content').classList.remove('hidden');
+                document.getElementById('navbar').classList.remove('hidden');
+                document.getElementById('header-avatar').innerHTML = `<img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}">`;
+                
+                // Realtime Subscriptions
+                // 1. Profile
+                db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('profile').doc('data')
+                .onSnapshot(snap => {
+                    if (snap.exists()) {
+                        userData = snap.data();
+                        document.getElementById('header-balance').innerText = userData.balance;
+                        if (activeTab === 'profile') render();
+                    }
+                });
 
-        window.showModal = (id) => {
-            document.getElementById('modal-overlay').classList.remove('hidden');
-            document.querySelectorAll('#modal-overlay > div').forEach(d => d.classList.add('hidden'));
-            document.getElementById(id).classList.remove('hidden');
-        };
+                // 2. Matches
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
+                .onSnapshot(snap => {
+                    matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                    if (activeTab === 'home') render();
+                });
 
-        window.closeModals = () => document.getElementById('modal-overlay').classList.add('hidden');
+                // 3. Chat
+                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat')
+                .orderBy('timestamp', 'desc').limit(30)
+                .onSnapshot(snap => {
+                    chatMessages = snap.docs.map(d => ({id: d.id, ...d.data()})).reverse();
+                    if (activeTab === 'lobby') render();
+                });
 
-        const loadingBtn = (id, loading, text) => {
-            const btn = document.getElementById(id);
-            btn.disabled = loading;
-            btn.innerHTML = loading ? `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>` : text;
-            lucide.createIcons();
-        };
+                // 4. Global Alert
+                db.collection('artifacts').doc(appId).collection('public').doc('data').doc('globalAlert')
+                .onSnapshot(snap => {
+                    if (snap.exists()) {
+                        globalAlert = snap.data();
+                        document.getElementById('global-alert-container').classList.remove('hidden');
+                        document.getElementById('global-alert-text').innerText = globalAlert.text;
+                    }
+                });
 
-        window.copyReferral = () => {
-            const code = document.getElementById('ref-code').innerText;
-            navigator.clipboard.writeText(code);
-            showToast("Code Copied!");
-        };
+                render();
+            } else {
+                document.getElementById('auth-section').classList.remove('hidden');
+                document.getElementById('main-content').classList.add('hidden');
+                document.getElementById('navbar').classList.add('hidden');
+            }
+            setLoader(false);
+        });
 
-        lucide.createIcons();
     </script>
 </body>
 </html>
