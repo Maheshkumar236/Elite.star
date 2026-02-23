@@ -3,124 +3,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Pro Arena</title>
+    <title>Elite Pro Arena | Pro Gaming</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Firebase SDKs -->
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #05050a; color: white; }
         .custom-scrollbar::-webkit-scrollbar { width: 0px; }
-        @keyframes swing {
-            0%, 100% { transform: rotate(-10deg); }
-            50% { transform: rotate(10deg); }
-        }
+        @keyframes swing { 0%, 100% { transform: rotate(-10deg); } 50% { transform: rotate(10deg); } }
         .animate-swing { animation: swing 2s ease-in-out infinite; }
-        .glass-nav { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.1); }
-        .orange-glow { box-shadow: 0 0 20px rgba(234, 88, 12, 0.2); }
+        .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .tab-active { color: #ea580c; transform: scale(1.1); }
+        .tab-active div { background: rgba(234, 88, 12, 0.1); }
     </style>
 </head>
-<body class="bg-[#05050a] text-white">
+<body>
 
-    <!-- Recaptcha Container (Hidden) -->
     <div id="recaptcha-container"></div>
 
-    <!-- App Container -->
-    <div id="app" class="min-h-screen flex flex-col">
-        <!-- Loading Screen -->
-        <div id="loader" class="fixed inset-0 bg-[#05050a] z-[1000] flex flex-col items-center justify-center space-y-4">
-            <div class="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
-            <div class="text-orange-600 font-black italic tracking-widest animate-pulse uppercase">Elite Arena...</div>
-        </div>
+    <!-- UI TOAST -->
+    <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[2000] px-6 py-4 rounded-full bg-orange-600 text-white font-black italic text-xs hidden animate-bounce uppercase shadow-2xl"></div>
 
-        <!-- Toast Notification -->
-        <div id="toast" class="fixed top-10 left-1/2 -translate-x-1/2 z-[1000] px-6 py-4 rounded-full bg-orange-600 text-white font-black italic text-xs hidden animate-bounce uppercase"></div>
-
-        <!-- Auth Section -->
-        <div id="auth-section" class="hidden min-h-screen flex flex-col items-center justify-center p-8">
-            <div class="w-full max-w-sm space-y-8">
-                <div class="text-center">
-                    <div class="w-16 h-16 bg-orange-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg shadow-orange-600/30">
-                        <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
-                    </div>
-                    <h1 class="text-4xl font-black italic uppercase tracking-tighter">Elite Login</h1>
-                    <p class="text-gray-500 text-sm mt-2">Enter the arena of champions</p>
-                </div>
-
-                <div id="phone-form" class="space-y-4">
-                    <div class="relative">
-                        <input id="phone-input" type="tel" placeholder="Mobile Number" maxLength="10" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-6 outline-none font-bold focus:border-orange-600/50 transition-all">
-                    </div>
-                    <button onclick="sendOtp()" id="send-btn" class="w-full bg-orange-600 hover:bg-orange-700 py-5 rounded-2xl font-black shadow-lg shadow-orange-600/20 uppercase tracking-widest transition-all">Get OTP</button>
-                </div>
-
-                <div id="otp-form" class="hidden space-y-4">
-                    <input id="otp-input" type="text" placeholder="0 0 0 0 0 0" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-center text-2xl tracking-[0.5em] font-black outline-none focus:border-orange-600/50">
-                    <button onclick="verifyOtp()" id="verify-btn" class="w-full bg-orange-600 hover:bg-orange-700 py-5 rounded-2xl font-black shadow-lg shadow-orange-600/20 uppercase tracking-widest">Verify & Enter</button>
-                    <button onclick="resetAuth()" class="w-full text-gray-500 text-sm font-bold">Try Different Number</button>
-                </div>
-            </div>
-        </div>
-
-        <!-- Main Content (Hidden initially) -->
-        <div id="main-content" class="hidden flex-1 pb-32">
-            <!-- Header -->
-            <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
-                <div class="flex items-center gap-2">
-                    <div class="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                    </div>
-                    <h1 class="font-black italic text-lg uppercase tracking-tighter">Elite <span class="text-orange-600">Pro</span></h1>
-                </div>
-                <div class="flex items-center gap-3">
-                    <div class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs font-black">
-                        <span class="text-green-500 font-bold">₹</span> <span id="header-balance">0</span>
-                    </div>
-                    <div class="w-8 h-8 rounded-full border border-orange-600/30 overflow-hidden" id="header-avatar"></div>
-                </div>
-            </header>
-
-            <!-- Global Alert -->
-            <div id="global-alert-container" class="pt-20 px-6 hidden">
-                <div class="bg-orange-600/10 border border-orange-600/20 p-4 rounded-2xl flex items-center gap-3">
-                    <div class="animate-swing"><svg class="w-5 h-5 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></div>
-                    <p id="global-alert-text" class="text-xs font-bold text-orange-200 truncate"></p>
-                </div>
-            </div>
-
-            <main id="tab-container" class="max-w-xl mx-auto px-6 pt-24"></main>
-        </div>
-
-        <!-- Navigation -->
-        <nav id="navbar" class="hidden fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl">
-            <button onclick="setTab('home')" class="nav-item flex flex-col items-center gap-1.5 px-6 transition-all duration-300 text-orange-500 scale-110" id="nav-home">
-                <div class="p-1 rounded-xl bg-orange-600/10">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                </div>
-                <span class="text-[9px] font-black uppercase italic tracking-widest">Warzone</span>
-            </button>
-            <button onclick="setTab('lobby')" class="nav-item flex flex-col items-center gap-1.5 px-6 transition-all duration-300 text-gray-500 opacity-60" id="nav-lobby">
-                <div class="p-1 rounded-xl">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                </div>
-                <span class="text-[9px] font-black uppercase italic tracking-widest">Lobby</span>
-            </button>
-            <button onclick="setTab('profile')" class="nav-item flex flex-col items-center gap-1.5 px-6 transition-all duration-300 text-gray-500 opacity-60" id="nav-profile">
-                <div class="p-1 rounded-xl">
-                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg>
-                </div>
-                <span class="text-[9px] font-black uppercase italic tracking-widest">Arsenal</span>
-            </button>
-        </nav>
-
-        <!-- Modals Container -->
-        <div id="modal-container"></div>
+    <!-- LOADING SCREEN -->
+    <div id="loader" class="fixed inset-0 bg-[#05050a] z-[1500] flex flex-col items-center justify-center space-y-4 transition-opacity duration-500">
+        <div class="w-12 h-12 border-4 border-orange-600 border-t-transparent rounded-full animate-spin"></div>
+        <div class="text-orange-600 font-black italic tracking-widest animate-pulse uppercase">Syncing Arena...</div>
     </div>
 
-    <script>
-        // --- Firebase Initialization ---
+    <!-- AUTH SCREEN -->
+    <div id="auth-screen" class="hidden min-h-screen flex items-center justify-center p-8">
+        <div class="w-full max-w-sm space-y-8">
+            <div class="text-center">
+                <div class="w-20 h-20 bg-orange-600 rounded-[2rem] flex items-center justify-center mx-auto mb-6 shadow-xl shadow-orange-600/20 rotate-12">
+                    <svg class="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </div>
+                <h1 class="text-4xl font-black italic uppercase tracking-tighter">Elite <span class="text-orange-600">Pro</span></h1>
+                <p class="text-gray-500 text-sm mt-2 font-bold uppercase tracking-widest" id="auth-title">Member Login</p>
+            </div>
+
+            <!-- Steps: Login or Register Toggle -->
+            <div id="auth-steps" class="space-y-4">
+                <!-- Phone Input -->
+                <div id="step-phone" class="space-y-4">
+                    <input id="phone-input" type="tel" placeholder="Mobile Number" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold focus:border-orange-600/50">
+                    <input id="pass-input" type="password" placeholder="Password" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold focus:border-orange-600/50">
+                    <button onclick="handleLogin()" class="w-full bg-orange-600 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-orange-600/20">Login</button>
+                    <button onclick="toggleAuthMode(true)" class="w-full text-gray-500 text-xs font-bold uppercase">New Warrior? Create Account</button>
+                </div>
+
+                <!-- OTP Step (Registration) -->
+                <div id="step-otp" class="hidden space-y-4">
+                    <p class="text-center text-xs text-orange-500 font-bold">OTP sent to your number</p>
+                    <input id="otp-input" type="text" placeholder="6-Digit OTP" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-center text-2xl font-black tracking-widest outline-none">
+                    <button onclick="verifyRegistrationOtp()" class="w-full bg-orange-600 py-5 rounded-2xl font-black uppercase tracking-widest">Verify & Set Password</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- MAIN APP -->
+    <div id="main-app" class="hidden min-h-screen flex flex-col">
+        <!-- Header -->
+        <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-2xl border-b border-white/5 flex items-center justify-between px-6 z-50">
+            <div class="flex items-center gap-2">
+                <div class="w-8 h-8 bg-orange-600 rounded-lg flex items-center justify-center"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z" stroke-width="2.5"></path></svg></div>
+                <span class="font-black italic text-lg uppercase">Elite Arena</span>
+            </div>
+            <div class="flex items-center gap-3">
+                <div onclick="setTab('profile')" class="px-4 py-1.5 rounded-full bg-white/5 border border-white/10 flex items-center gap-2 text-xs font-black cursor-pointer hover:bg-white/10 transition-all">
+                    <span class="text-green-500">₹</span> <span id="user-balance">0</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Global Alert -->
+        <div id="global-alert-box" class="pt-20 px-6 hidden">
+            <div class="bg-orange-600/10 border border-orange-600/20 p-4 rounded-2xl flex items-center gap-3">
+                <div class="animate-swing text-orange-500"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" stroke-width="2"></path></svg></div>
+                <p id="alert-text" class="text-xs font-bold text-orange-200 truncate"></p>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <main id="content" class="flex-1 max-w-xl mx-auto w-full px-6 pt-24 pb-32"></main>
+
+        <!-- Navigation -->
+        <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-2 z-50">
+            <button onclick="setTab('home')" id="nav-home" class="nav-btn flex flex-col items-center gap-1 transition-all">
+                <div class="p-2 rounded-xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" stroke-width="2.5"></path></svg></div>
+                <span class="text-[9px] font-black uppercase italic">Warzone</span>
+            </button>
+            <button onclick="setTab('lobby')" id="nav-lobby" class="nav-btn flex flex-col items-center gap-1 transition-all">
+                <div class="p-2 rounded-xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" stroke-width="2.5"></path></svg></div>
+                <span class="text-[9px] font-black uppercase italic">Lobby</span>
+            </button>
+            <button onclick="setTab('profile')" id="nav-profile" class="nav-btn flex flex-col items-center gap-1 transition-all">
+                <div class="p-2 rounded-xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" stroke-width="2.5"></path></svg></div>
+                <span class="text-[9px] font-black uppercase italic">Arsenal</span>
+            </button>
+        </nav>
+    </div>
+
+    <!-- MODALS -->
+    <div id="modal-layer" class="hidden fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6"></div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithPhoneNumber, RecaptchaVerifier, signOut } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, query, orderBy, limit, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-functions.js";
+
+        // ==========================================
+        // CONFIGURATION (INSERT YOUR DATA HERE)
+        // ==========================================
         const firebaseConfig = {
   apiKey: "AIzaSyDPChNIAQz0gEmsuDFpACl0XvWm-DNcf2k",
   authDomain: "eliteweb-5b512.firebaseapp.com",
@@ -130,387 +125,324 @@
   appId: "1:474751993215:web:88be5ffccdd88651cf464a",
   measurementId: "G-9HZY4280CY"
 };
+        const appId = 'elite_pro_final_v1';
+        const RAZORPAY_KEY = "rzp_test_xxxxxxx"; // Replace with your key
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+
+        // --- GLOBAL STATE ---
+        let state = {
+            user: null,
+            userData: null,
+            activeTab: 'home',
+            matches: [],
+            lobbyMessages: [],
+            isRegistering: false,
+            confirmationResult: null
         };
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const appId = 'elite_arena_v2';
 
-        // --- Global State ---
-        let currentUser = null;
-        let userData = null;
-        let activeTab = 'home';
-        let matches = [];
-        let chatMessages = [];
-        let globalAlert = null;
-        let adminTapCount = 0;
-        let confirmationResult = null;
-
-        // --- UI Utilities ---
-        function showMessage(msg, type = 'success') {
-            const toast = document.getElementById('toast');
-            toast.innerText = msg;
-            toast.classList.remove('hidden', 'bg-orange-600', 'bg-red-600');
-            toast.classList.add(type === 'error' ? 'bg-red-600' : 'bg-orange-600');
-            setTimeout(() => toast.classList.add('hidden'), 3000);
-        }
-
-        function setLoader(show) {
-            document.getElementById('loader').classList.toggle('hidden', !show);
-        }
-
-        // --- Auth Functions ---
-        function setupRecaptcha() {
-            if (!window.recaptchaVerifier) {
-                window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                    'size': 'invisible'
-                });
+        // --- UI HELPERS ---
+        const ui = {
+            toast: (msg, type = 'success') => {
+                const el = document.getElementById('toast');
+                el.innerText = msg;
+                el.className = `fixed top-10 left-1/2 -translate-x-1/2 z-[2000] px-6 py-4 rounded-full text-white font-black italic text-xs animate-bounce uppercase shadow-2xl ${type === 'error' ? 'bg-red-600' : 'bg-orange-600'}`;
+                el.classList.remove('hidden');
+                setTimeout(() => el.classList.add('hidden'), 3000);
+            },
+            loader: (show) => {
+                document.getElementById('loader').style.opacity = show ? '1' : '0';
+                setTimeout(() => document.getElementById('loader').classList.toggle('hidden', !show), 500);
+            },
+            modal: (content, show = true) => {
+                const layer = document.getElementById('modal-layer');
+                layer.innerHTML = content || '';
+                layer.classList.toggle('hidden', !show);
             }
-        }
+        };
 
-        async function sendOtp() {
+        // --- AUTH LOGIC ---
+        window.toggleAuthMode = (isReg) => {
+            state.isRegistering = isReg;
+            document.getElementById('auth-title').innerText = isReg ? 'Warrior Registration' : 'Member Login';
+            document.querySelector('#step-phone button').innerText = isReg ? 'Verify Phone (OTP)' : 'Login';
+        };
+
+        window.handleLogin = async () => {
             const phone = document.getElementById('phone-input').value;
-            if (phone.length < 10) return showMessage("Invalid Number", "error");
-            setupRecaptcha();
-            setLoader(true);
-            try {
-                confirmationResult = await auth.signInWithPhoneNumber(`+91${phone}`, window.recaptchaVerifier);
-                document.getElementById('phone-form').classList.add('hidden');
-                document.getElementById('otp-form').classList.remove('hidden');
-                showMessage("OTP Sent!");
-            } catch (err) {
-                showMessage("Failed to send SMS", "error");
-                console.error(err);
-            }
-            setLoader(false);
-        }
+            const pass = document.getElementById('pass-input').value;
 
-        async function verifyOtp() {
+            if (phone.length < 10) return ui.toast("Invalid phone number", "error");
+            
+            ui.loader(true);
+            if (state.isRegistering) {
+                // REGISTRATION FLOW
+                try {
+                    const verifier = new RecaptchaVerifier(auth, 'recaptcha-container', { size: 'invisible' });
+                    state.confirmationResult = await signInWithPhoneNumber(auth, `+91${phone}`, verifier);
+                    document.getElementById('step-phone').classList.add('hidden');
+                    document.getElementById('step-otp').classList.remove('hidden');
+                    ui.toast("OTP Sent!");
+                } catch (e) { ui.toast("Verification failed", "error"); }
+            } else {
+                // LOGIN FLOW (Phone + Password)
+                try {
+                    const loginFunc = httpsCallable(functions, 'verifySecureLogin');
+                    const result = await loginFunc({ phone, password: pass });
+                    if (result.data.success) {
+                        // Normally we'd use a custom token returned from the function
+                        // For this demo structure, we use simple phone auth + password doc check
+                        // REAL PRO: Use result.data.token to signInWithCustomToken
+                        await auth.signInAnonymously(); // Simplified for demo; use proper custom token in prod
+                    } else {
+                        ui.toast("Invalid Credentials", "error");
+                    }
+                } catch (e) { ui.toast("Login server error", "error"); }
+            }
+            ui.loader(false);
+        };
+
+        window.verifyRegistrationOtp = async () => {
             const otp = document.getElementById('otp-input').value;
-            setLoader(true);
+            const pass = document.getElementById('pass-input').value;
+            if (pass.length < 6) return ui.toast("Password must be 6+ chars", "error");
+
+            ui.loader(true);
             try {
-                const result = await confirmationResult.confirm(otp);
-                const user = result.user;
-                const profileRef = db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('profile').doc('data');
-                const snap = await profileRef.get();
-                if (!snap.exists()) {
-                    await profileRef.set({
-                        username: `Player_${user.uid.slice(0, 5)}`,
-                        balance: 50,
-                        uid: user.uid,
-                        phone: user.phoneNumber,
-                        totalWins: 0,
-                        joinedMatches: [],
-                        xp: 10,
-                        role: 'user'
-                    });
-                }
-            } catch (err) {
-                showMessage("Invalid OTP", "error");
-            }
-            setLoader(false);
-        }
+                const result = await state.confirmationResult.confirm(otp);
+                // After phone verified, create the profile with hashed password via function
+                const regFunc = httpsCallable(functions, 'registerUserProfile');
+                await regFunc({ password: pass, username: `Player_${result.user.uid.slice(0,5)}` });
+                ui.toast("Account Created!");
+            } catch (e) { ui.toast("Invalid OTP", "error"); }
+            ui.loader(false);
+        };
 
-        function resetAuth() {
-            document.getElementById('phone-form').classList.remove('hidden');
-            document.getElementById('otp-form').classList.add('hidden');
-        }
-
-        // --- Tab Management ---
-        function setTab(tab) {
-            activeTab = tab;
-            // Update UI Icons
-            ['home', 'lobby', 'profile'].forEach(t => {
-                const navBtn = document.getElementById(`nav-${t}`);
-                if (t === tab) {
-                    navBtn.classList.remove('text-gray-500', 'opacity-60');
-                    navBtn.classList.add('text-orange-500', 'scale-110');
-                    navBtn.querySelector('div').classList.add('bg-orange-600/10');
-                } else {
-                    navBtn.classList.add('text-gray-500', 'opacity-60');
-                    navBtn.classList.remove('text-orange-500', 'scale-110');
-                    navBtn.querySelector('div').classList.remove('bg-orange-600/10');
+        // --- DATA LISTENERS ---
+        const initDataListeners = () => {
+            // Profile
+            onSnapshot(doc(db, 'artifacts', appId, 'users', auth.currentUser.uid, 'profile', 'data'), (snap) => {
+                if (snap.exists()) {
+                    state.userData = snap.data();
+                    document.getElementById('user-balance').innerText = state.userData.balance;
+                    if (state.activeTab === 'profile') render();
                 }
             });
+
+            // Matches
+            onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'matches'), (snap) => {
+                state.matches = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (state.activeTab === 'home') render();
+            });
+
+            // Lobby
+            const qChat = query(collection(db, 'artifacts', appId, 'public', 'data', 'chat'), orderBy('timestamp', 'desc'), limit(30));
+            onSnapshot(qChat, (snap) => {
+                state.lobbyMessages = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
+                if (state.activeTab === 'lobby') render();
+            });
+
+            // Alerts
+            onSnapshot(doc(db, 'artifacts', appId, 'public', 'data', 'globalAlert'), (snap) => {
+                if (snap.exists()) {
+                    const alert = snap.data();
+                    document.getElementById('global-alert-box').classList.remove('hidden');
+                    document.getElementById('alert-text').innerText = alert.text;
+                }
+            });
+        };
+
+        // --- NAVIGATION & RENDERING ---
+        window.setTab = (tab) => {
+            state.activeTab = tab;
+            document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('tab-active'));
+            document.getElementById(`nav-${tab}`).classList.add('tab-active');
             render();
-        }
+        };
 
-        // --- Render Core ---
-        function render() {
-            const container = document.getElementById('tab-container');
-            container.innerHTML = '';
+        const render = () => {
+            const root = document.getElementById('content');
+            root.innerHTML = '';
 
-            if (activeTab === 'home') {
-                let html = `<div class="space-y-6">
+            if (state.activeTab === 'home') {
+                let html = `<div class="space-y-6 animate-in fade-in duration-500">
                     <div class="flex items-center justify-between">
-                        <h2 class="text-xl font-black italic uppercase">Tournaments</h2>
-                        <div class="flex gap-2">
-                            <div class="px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-gray-400">BGMI</div>
-                            <div class="px-3 py-1 bg-white/5 rounded-full text-[10px] font-bold text-gray-400">FF</div>
-                        </div>
+                        <h2 class="text-xl font-black italic uppercase">Live Tournaments</h2>
+                        <span class="text-[10px] bg-orange-600/10 text-orange-500 px-3 py-1 rounded-full font-bold">ACTIVE</span>
                     </div>`;
                 
-                if (matches.length === 0) {
-                    html += `<div class="py-20 text-center opacity-50"><p class="font-bold">No Active Matches</p></div>`;
-                } else {
-                    matches.forEach(m => {
-                        html += `
-                        <div class="relative bg-white/5 border border-white/10 overflow-hidden rounded-[2.5rem]">
-                            <div class="absolute top-0 right-0 px-6 py-2 bg-orange-600 text-[10px] font-black italic uppercase rounded-bl-[1.5rem]">${m.type || 'SOLO'}</div>
-                            <div class="p-8">
-                                <h3 class="text-2xl font-black italic uppercase mb-2">${m.title}</h3>
-                                <div class="grid grid-cols-2 gap-4 mt-6">
-                                    <div class="bg-black/40 p-3 rounded-2xl border border-white/5">
-                                        <p class="text-[10px] text-gray-500 font-black">PRIZE</p>
-                                        <p class="text-lg font-black text-green-500">₹${m.prizePool}</p>
-                                    </div>
-                                    <div class="bg-black/40 p-3 rounded-2xl border border-white/5">
-                                        <p class="text-[10px] text-gray-500 font-black">ENTRY</p>
-                                        <p class="text-lg font-black text-orange-500">₹${m.entryFee}</p>
-                                    </div>
-                                </div>
-                                <button onclick="openJoinModal('${m.id}')" class="w-full mt-8 bg-orange-600 py-4 rounded-2xl font-black uppercase tracking-widest shadow-xl shadow-orange-600/20">Register Now</button>
-                            </div>
-                        </div>`;
-                    });
-                }
-                html += `</div>`;
-                container.innerHTML = html;
-
-            } else if (activeTab === 'lobby') {
-                let html = `<div class="h-[calc(100vh-250px)] flex flex-col">
-                    <div class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar" id="chat-messages">`;
-                chatMessages.forEach(msg => {
-                    const isMe = msg.uid === currentUser.uid;
+                state.matches.forEach(m => {
                     html += `
-                    <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
-                        <span class="text-[10px] text-gray-500 mb-1 font-bold uppercase">${msg.username}</span>
-                        <div class="max-w-[80%] px-4 py-3 rounded-2xl text-sm font-medium ${isMe ? 'bg-orange-600 text-white rounded-tr-none' : 'bg-white/10 text-white rounded-tl-none border border-white/5'}">
-                            ${msg.text}
+                    <div class="relative bg-white/5 border border-white/10 rounded-[2.5rem] overflow-hidden group hover:border-orange-600/30 transition-all">
+                        <div class="absolute top-0 right-0 bg-orange-600 px-6 py-2 text-[10px] font-black uppercase italic rounded-bl-3xl z-10">${m.type || 'SOLO'}</div>
+                        <div class="p-8">
+                            <h3 class="text-2xl font-black uppercase italic mb-1">${m.title}</h3>
+                            <div class="flex gap-4 mt-6">
+                                <div class="flex-1 bg-black/40 p-4 rounded-3xl border border-white/5">
+                                    <p class="text-[9px] text-gray-500 font-black uppercase">Win Prize</p>
+                                    <p class="text-lg font-black text-green-500">₹${m.prizePool}</p>
+                                </div>
+                                <div class="flex-1 bg-black/40 p-4 rounded-3xl border border-white/5">
+                                    <p class="text-[9px] text-gray-500 font-black uppercase">Entry Fee</p>
+                                    <p class="text-lg font-black text-orange-500">₹${m.entryFee}</p>
+                                </div>
+                            </div>
+                            <button onclick="openJoinDialog('${m.id}')" class="w-full mt-8 bg-orange-600 py-4 rounded-2xl font-black uppercase tracking-widest hover:scale-[1.02] active:scale-95 transition-all shadow-xl shadow-orange-600/20">Join Warzone</button>
                         </div>
+                    </div>`;
+                });
+                root.innerHTML = html + `</div>`;
+            }
+
+            if (state.activeTab === 'lobby') {
+                let html = `<div class="h-[60vh] flex flex-col space-y-4">
+                    <div id="chat-scroller" class="flex-1 overflow-y-auto space-y-4 pr-2 custom-scrollbar">`;
+                state.lobbyMessages.forEach(msg => {
+                    const isMe = msg.uid === auth.currentUser.uid;
+                    html += `<div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+                        <span class="text-[9px] text-gray-600 font-black uppercase mb-1 px-2">${msg.username}</span>
+                        <div class="max-w-[80%] px-4 py-3 rounded-2xl text-sm font-medium ${isMe ? 'bg-orange-600 rounded-tr-none' : 'bg-white/10 border border-white/5 rounded-tl-none'}">${msg.text}</div>
                     </div>`;
                 });
                 html += `</div>
-                    <form onsubmit="event.preventDefault(); sendChatMsg()" class="mt-4 flex gap-2">
-                        <input id="chat-input" placeholder="Type message..." class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-4 outline-none font-bold text-sm">
-                        <button type="submit" class="bg-orange-600 p-4 rounded-2xl"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path></svg></button>
-                    </form>
-                </div>`;
-                container.innerHTML = html;
-                const chatBox = document.getElementById('chat-messages');
-                if (chatBox) chatBox.scrollTop = chatBox.scrollHeight;
-
-            } else if (activeTab === 'profile') {
-                container.innerHTML = `
-                <div class="space-y-6">
-                    <div class="text-center py-8">
-                        <div class="w-32 h-32 mx-auto relative">
-                            <div class="absolute inset-0 bg-orange-600 rounded-[2.5rem] blur-2xl opacity-20"></div>
-                            <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${currentUser.uid}" class="w-32 h-32 rounded-[2.5rem] border-4 border-orange-600/20 relative z-10">
-                        </div>
-                        <h2 onclick="handleAdminSecret()" class="mt-6 text-3xl font-black italic uppercase">${userData?.username || 'Gamer'}</h2>
-                        <p class="text-gray-500 text-sm font-bold mt-1">Level ${Math.floor((userData?.xp || 0) / 10)} Elite Warrior</p>
+                    <div class="flex gap-2">
+                        <input id="chat-input" placeholder="Type battle cry..." class="flex-1 bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm">
+                        <button onclick="sendLobbyChat()" class="bg-orange-600 p-4 rounded-2xl"><svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" stroke-width="2"></path></svg></button>
                     </div>
+                </div>`;
+                root.innerHTML = html;
+                const scroller = document.getElementById('chat-scroller');
+                if (scroller) scroller.scrollTop = scroller.scrollHeight;
+            }
+
+            if (state.activeTab === 'profile') {
+                root.innerHTML = `
+                <div class="space-y-6 text-center animate-in slide-in-from-bottom-4">
+                    <div class="relative w-32 h-32 mx-auto">
+                        <div class="absolute inset-0 bg-orange-600 blur-3xl opacity-20 rounded-full"></div>
+                        <img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${auth.currentUser.uid}" class="w-32 h-32 rounded-[2.5rem] border-4 border-orange-600/20 relative z-10 bg-[#05050a]">
+                    </div>
+                    <h2 class="text-3xl font-black italic uppercase tracking-tighter">${state.userData?.username || 'WARRIOR'}</h2>
+                    <p class="text-orange-500 font-black text-xs uppercase tracking-widest">RANK: ELITE | XP: ${state.userData?.xp || 0}</p>
+                    
                     <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-white/5 p-6 rounded-[2rem] text-center border border-white/10">
-                            <p class="text-[10px] text-gray-500 font-black">WINS</p>
-                            <p class="text-2xl font-black text-orange-500">${userData?.totalWins || 0}</p>
+                        <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem]">
+                            <p class="text-[9px] text-gray-500 font-black uppercase mb-1">Total Wins</p>
+                            <p class="text-2xl font-black text-white">${state.userData?.totalWins || 0}</p>
                         </div>
-                        <div class="bg-white/5 p-6 rounded-[2rem] text-center border border-white/10">
-                            <p class="text-[10px] text-gray-500 font-black">JOINED</p>
-                            <p class="text-2xl font-black text-white">${userData?.joinedMatches?.length || 0}</p>
+                        <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem]">
+                            <p class="text-[9px] text-gray-500 font-black uppercase mb-1">Balance</p>
+                            <p class="text-2xl font-black text-green-500">₹${state.userData?.balance || 0}</p>
                         </div>
                     </div>
-                    <div class="space-y-2">
-                        <button onclick="showMessage('Pay Gate Coming Soon')" class="w-full flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-[2rem]">
-                            <span class="font-black italic uppercase text-sm tracking-widest">Add Funds</span>
-                            <span class="text-green-500 font-bold">RECHARGE</span>
+
+                    <div class="space-y-3 pt-4">
+                        <button onclick="initiateDeposit()" class="w-full flex items-center justify-between p-6 bg-white/5 border border-white/10 rounded-[2rem] hover:bg-white/10 transition-all">
+                            <span class="font-black uppercase italic text-sm">Add War Funds</span>
+                            <svg class="w-5 h-5 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M12 4v16m8-8H4" stroke-width="3"></path></svg>
                         </button>
-                        <button onclick="auth.signOut()" class="w-full p-6 bg-red-600/5 border border-red-600/10 rounded-[2rem] text-red-500 font-black italic uppercase text-sm">Logout Session</button>
+                        <button onclick="auth.signOut()" class="w-full p-6 bg-red-600/5 border border-red-600/10 rounded-[2rem] text-red-500 font-black uppercase italic text-sm">Retreat (Logout)</button>
                     </div>
                 </div>`;
             }
-        }
+        };
 
-        // --- Core Logics ---
-        async function openJoinModal(matchId) {
-            const match = matches.find(m => m.id === matchId);
-            if (!match) return;
-            if (userData.balance < match.entryFee) return showMessage("Insufficient Balance", "error");
-
-            const modalHtml = `
-            <div id="join-modal" class="fixed inset-0 bg-black/95 backdrop-blur-md flex items-center justify-center p-6 z-[100]">
-                <div class="bg-[#0c0c0c] border border-orange-600/20 p-8 rounded-[3rem] w-full max-w-sm">
-                    <h3 class="text-2xl font-black italic uppercase mb-6 text-center">Confirm Entry</h3>
-                    <form onsubmit="event.preventDefault(); confirmJoin('${matchId}')" class="space-y-4">
-                        <input id="join-ign" placeholder="In-Game Name (IGN)" required class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold">
-                        <input id="join-uid" placeholder="Character UID" required class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold">
-                        <button type="submit" class="w-full bg-orange-600 py-5 rounded-2xl font-black uppercase shadow-lg shadow-orange-600/20">Pay ₹${match.entryFee}</button>
-                        <button type="button" onclick="document.getElementById('join-modal').remove()" class="w-full text-gray-500 font-bold text-sm">Cancel</button>
-                    </form>
-                </div>
-            </div>`;
-            document.getElementById('modal-container').innerHTML = modalHtml;
-        }
-
-        async function confirmJoin(matchId) {
-            const match = matches.find(m => m.id === matchId);
-            const ign = document.getElementById('join-ign').value;
-            const guid = document.getElementById('join-uid').value;
+        // --- MATCH & PAYMENT CORE (SECURE CALLS) ---
+        window.openJoinDialog = (mid) => {
+            const m = state.matches.find(x => x.id === mid);
+            if (state.userData.balance < m.entryFee) return ui.toast("Insufficient Gold!", "error");
             
-            setLoader(true);
-            try {
-                // Update Match
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches').doc(matchId).update({
-                    joinedCount: firebase.firestore.FieldValue.increment(1),
-                    participants: firebase.firestore.FieldValue.arrayUnion({ uid: currentUser.uid, gameName: ign, gameUID: guid, joinedAt: Date.now() })
-                });
-
-                // Update Profile
-                await db.collection('artifacts').doc(appId).collection('users').doc(currentUser.uid).collection('profile').doc('data').update({
-                    balance: firebase.firestore.FieldValue.increment(-match.entryFee),
-                    joinedMatches: firebase.firestore.FieldValue.arrayUnion(matchId)
-                });
-
-                document.getElementById('join-modal').remove();
-                showMessage("Joined Tournament!");
-            } catch (err) {
-                showMessage("Join Failed", "error");
-            }
-            setLoader(false);
-        }
-
-        async function sendChatMsg() {
-            const input = document.getElementById('chat-input');
-            const text = input.value.trim();
-            if (!text) return;
-            try {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat').add({
-                    uid: currentUser.uid,
-                    username: userData.username,
-                    text: text,
-                    timestamp: firebase.firestore.FieldValue.serverTimestamp()
-                });
-                input.value = '';
-            } catch (e) {}
-        }
-
-        function handleAdminSecret() {
-            adminTapCount++;
-            if (adminTapCount >= 10) {
-                openAdminPanel();
-                adminTapCount = 0;
-            }
-        }
-
-        function openAdminPanel() {
-            const modalHtml = `
-            <div id="admin-modal" class="fixed inset-0 bg-black/95 flex items-center justify-center p-4 z-[200]">
-                <div class="bg-[#0c0c0c] border border-orange-600 p-8 rounded-[3rem] w-full max-w-md max-h-[90vh] overflow-y-auto custom-scrollbar">
-                    <div class="flex items-center justify-between mb-8">
-                        <h2 class="text-2xl font-black italic uppercase text-orange-600">Admin Control</h2>
-                        <button onclick="document.getElementById('admin-modal').remove()"><svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M6 18L18 6M6 6l12 12" stroke-width="2" stroke-linecap="round"></path></svg></button>
+            ui.modal(`
+                <div class="w-full max-w-sm bg-[#0c0c0c] border border-orange-600/20 rounded-[3rem] p-8 space-y-6">
+                    <h3 class="text-2xl font-black uppercase italic text-center">Confirm Entry</h3>
+                    <div class="bg-white/5 p-4 rounded-2xl text-center">
+                        <p class="text-[10px] text-gray-500 font-black">TOURNAMENT</p>
+                        <p class="font-bold text-orange-500">${m.title}</p>
                     </div>
-                    <form onsubmit="event.preventDefault(); createMatch(this)" class="space-y-4">
-                        <input name="title" placeholder="Match Title" required class="w-full bg-white/5 p-4 rounded-xl outline-none">
-                        <div class="grid grid-cols-2 gap-2">
-                            <input name="fee" type="number" placeholder="Fee" required class="w-full bg-white/5 p-4 rounded-xl">
-                            <input name="prize" type="number" placeholder="Prize" required class="w-full bg-white/5 p-4 rounded-xl">
-                        </div>
-                        <input name="type" placeholder="Type (SOLO/DUO)" class="w-full bg-white/5 p-4 rounded-xl">
-                        <button type="submit" class="w-full bg-orange-600 py-4 rounded-xl font-black">Launch Match</button>
-                    </form>
-                    <div class="mt-8 pt-8 border-t border-white/10">
-                        <input id="admin-alert" placeholder="New Alert Text" class="w-full bg-white/5 p-4 rounded-xl mb-2">
-                        <button onclick="updateGlobalAlert()" class="w-full bg-blue-600 py-4 rounded-xl font-black">Push Alert</button>
+                    <div class="space-y-4">
+                        <input id="game-ign" placeholder="Game Name (IGN)" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold">
+                        <input id="game-uid" placeholder="Game Character UID" class="w-full bg-white/5 border border-white/10 p-4 rounded-2xl outline-none font-bold">
                     </div>
+                    <button onclick="secureJoinMatch('${mid}')" class="w-full bg-orange-600 py-5 rounded-2xl font-black uppercase tracking-widest shadow-lg shadow-orange-600/20">Pay ₹${m.entryFee}</button>
+                    <button onclick="ui.modal(null, false)" class="w-full text-gray-500 font-bold text-sm">Cancel</button>
                 </div>
-            </div>`;
-            document.getElementById('modal-container').innerHTML = modalHtml;
-        }
+            `);
+        };
 
-        async function createMatch(form) {
-            const fd = new FormData(form);
-            setLoader(true);
+        window.secureJoinMatch = async (matchId) => {
+            const ign = document.getElementById('game-ign').value;
+            const guid = document.getElementById('game-uid').value;
+            if (!ign || !guid) return ui.toast("All fields required", "error");
+
+            ui.loader(true);
             try {
-                await db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches').add({
-                    title: fd.get('title'),
-                    entryFee: Number(fd.get('fee')),
-                    prizePool: Number(fd.get('prize')),
-                    type: fd.get('type'),
-                    joinedCount: 0,
-                    participants: [],
-                    time: 'ASAP'
-                });
-                showMessage("Match Launched!");
-                document.getElementById('admin-modal').remove();
-            } catch (e) { showMessage("Error", "error"); }
-            setLoader(false);
-        }
-
-        async function updateGlobalAlert() {
-            const text = document.getElementById('admin-alert').value;
-            if (!text) return;
-            await db.collection('artifacts').doc(appId).collection('public').doc('data').doc('globalAlert').set({
-                text: text,
-                timestamp: Date.now()
-            });
-            showMessage("Alert Updated!");
-            document.getElementById('admin-modal').remove();
-        }
-
-        // --- Auth State Listener ---
-        auth.onAuthStateChanged(user => {
-            currentUser = user;
-            if (user) {
-                document.getElementById('auth-section').classList.add('hidden');
-                document.getElementById('main-content').classList.remove('hidden');
-                document.getElementById('navbar').classList.remove('hidden');
-                document.getElementById('header-avatar').innerHTML = `<img src="https://api.dicebear.com/7.x/avataaars/svg?seed=${user.uid}">`;
+                // ==========================================
+                // CLOUD FUNCTION CALL (SECURITY CRITICAL)
+                // ==========================================
+                const joinFunc = httpsCallable(functions, 'joinTournamentV2');
+                const result = await joinFunc({ matchId, gameName: ign, gameUID: guid });
                 
-                // Realtime Subscriptions
-                // 1. Profile
-                db.collection('artifacts').doc(appId).collection('users').doc(user.uid).collection('profile').doc('data')
-                .onSnapshot(snap => {
-                    if (snap.exists()) {
-                        userData = snap.data();
-                        document.getElementById('header-balance').innerText = userData.balance;
-                        if (activeTab === 'profile') render();
+                if (result.data.success) {
+                    ui.modal(null, false);
+                    ui.toast("Tournament Joined!");
+                } else {
+                    ui.toast(result.data.message || "Join Failed", "error");
+                }
+            } catch (e) { ui.toast("Server error joining match", "error"); }
+            ui.loader(false);
+        };
+
+        window.initiateDeposit = async () => {
+            const amount = prompt("Enter amount to add (₹):");
+            if (!amount || isNaN(amount) || amount < 10) return ui.toast("Min amount ₹10", "error");
+
+            ui.loader(true);
+            try {
+                // 1. Create Order via Cloud Function
+                const createOrder = httpsCallable(functions, 'createRazorpayOrder');
+                const orderData = await createOrder({ amount: Number(amount) });
+
+                // 2. Open Razorpay
+                const options = {
+                    key: RAZORPAY_KEY,
+                    amount: orderData.data.amount,
+                    currency: "INR",
+                    order_id: orderData.data.id,
+                    handler: async function (response) {
+                        ui.loader(true);
+                        // 3. Verify Signature via Cloud Function
+                        const verifyPayment = httpsCallable(functions, 'verifyRazorpayPayment');
+                        const verifyResult = await verifyPayment(response);
+                        if (verifyResult.data.success) {
+                            ui.toast("Funds Added Successfully!");
+                        } else {
+                            ui.toast("Payment Verification Failed", "error");
+                        }
+                        ui.loader(false);
                     }
-                });
+                };
+                const rzp = new window.Razorpay(options);
+                rzp.open();
+            } catch (e) { ui.toast("Payment Initiation Failed", "error"); }
+            ui.loader(false);
+        };
 
-                // 2. Matches
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
-                .onSnapshot(snap => {
-                    matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                    if (activeTab === 'home') render();
-                });
-
-                // 3. Chat
-                db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat')
-                .orderBy('timestamp', 'desc').limit(30)
-                .onSnapshot(snap => {
-                    chatMessages = snap.docs.map(d => ({id: d.id, ...d.data()})).reverse();
-                    if (activeTab === 'lobby') render();
-                });
-
-                // 4. Global Alert
-                db.collection('artifacts').doc(appId).collection('public').doc('data').doc('globalAlert')
-                .onSnapshot(snap => {
-                    if (snap.exists()) {
-                        globalAlert = snap.data();
-                        document.getElementById('global-alert-container').classList.remove('hidden');
-                        document.getElementById('global-alert-text').innerText = globalAlert.text;
-                    }
-                });
-
-                render();
+        // --- INIT ---
+        onAuthStateChanged(auth, (user) => {
+            state.user = user;
+            ui.loader(false);
+            if (user) {
+                document.getElementById('auth-screen').classList.add('hidden');
+                document.getElementById('main-app').classList.remove('hidden');
+                initDataListeners();
+                setTab('home');
             } else {
-                document.getElementById('auth-section').classList.remove('hidden');
-                document.getElementById('main-content').classList.add('hidden');
-                document.getElementById('navbar').classList.add('hidden');
+                document.getElementById('auth-screen').classList.remove('hidden');
+                document.getElementById('main-app').classList.add('hidden');
             }
-            setLoader(false);
         });
 
     </script>
