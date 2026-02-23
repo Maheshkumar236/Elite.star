@@ -3,34 +3,177 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite App - Gaming Arena</title>
+    <title>Elite Arena Pro - Full Feature</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-auth-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore-compat.js"></script>
-
+    <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; background-color: #05050a; color: white; overflow-x: hidden; }
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .animate-in { animation: fadeIn 0.4s ease-out forwards; }
-        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-        input::placeholder { color: rgba(255,255,255,0.2); font-style: italic; }
+        body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; background-color: #05050a; color: white; }
+        .glass { background: rgba(0, 0, 0, 0.6); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.05); }
+        .orange-glow { box-shadow: 0 0 20px rgba(234, 88, 12, 0.2); }
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        input:focus { border-color: #ea580c !important; }
+        .tab-active { color: #ea580c; transform: scale(1.1); }
+        .animate-slide-up { animation: slideUp 0.4s ease-out; }
+        @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
     </style>
 </head>
-<body>
+<body class="pb-32 selection:bg-orange-600/30">
 
-    <div id="app">
-        <div id="loader" class="h-screen flex items-center justify-center text-orange-600 font-black italic tracking-widest animate-pulse">
-            INITIALIZING ARENA...
+    <!-- Loading Screen -->
+    <div id="loading-screen" class="fixed inset-0 z-[200] bg-[#05050a] flex items-center justify-center">
+        <div class="text-center">
+            <i data-lucide="zap" class="w-12 h-12 text-orange-600 animate-bounce mx-auto"></i>
+            <p class="font-black italic text-orange-600 animate-pulse mt-4">ELITE ARENA...</p>
         </div>
     </div>
 
-    <script>
-        // ==========================================
-        // CONFIGURATION (अपनी Keys यहाँ बदलें)
-        // ==========================================
+    <!-- Toast -->
+    <div id="toast-container" class="fixed top-10 left-1/2 -translate-x-1/2 z-[300] pointer-events-none"></div>
+
+    <!-- Header -->
+    <header class="fixed top-0 inset-x-0 h-16 glass flex items-center justify-between px-6 z-50">
+        <h1 class="font-black italic text-lg uppercase text-orange-600 tracking-tighter">ELITE PRO</h1>
+        <div id="wallet-display" class="px-4 py-1.5 rounded-2xl bg-white/5 border border-white/10 flex items-center gap-2 text-xs font-black">
+            <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹<span id="user-balance">0</span>
+        </div>
+    </header>
+
+    <!-- Global Alert (Jo original React file mein tha) -->
+    <div id="global-alert-container" class="fixed top-20 inset-x-6 z-40 hidden">
+        <div class="bg-orange-600 text-white p-3 rounded-2xl flex items-center gap-3 shadow-2xl animate-bounce">
+            <i data-lucide="bell" class="w-4 h-4"></i>
+            <p id="alert-text" class="text-[10px] font-bold uppercase"></p>
+        </div>
+    </div>
+
+    <!-- Main Screens -->
+    <main id="app-screens" class="pt-24 px-6 max-w-lg mx-auto">
+        
+        <!-- Login Screen (Visible when !user) -->
+        <div id="screen-auth" class="min-h-[70vh] flex flex-col items-center justify-center text-center space-y-8 hidden">
+            <div id="recaptcha-container"></div>
+            <i data-lucide="zap" class="w-16 h-16 text-orange-600 mx-auto"></i>
+            <h2 class="text-4xl font-black italic uppercase">Elite Login</h2>
+            
+            <div id="auth-step-1" class="w-full space-y-4">
+                <input id="auth-phone" type="tel" placeholder="Mobile Number" maxlength="10" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold">
+                <button onclick="sendOTP()" id="btn-otp" class="w-full bg-orange-600 py-5 rounded-2xl font-black">GET OTP</button>
+            </div>
+
+            <div id="auth-step-2" class="w-full space-y-4 hidden">
+                <input id="auth-otp" type="text" placeholder="6-Digit OTP" maxlength="6" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 text-center tracking-[1em] outline-none font-bold">
+                <button onclick="verifyOTP()" id="btn-verify" class="w-full bg-orange-600 py-5 rounded-2xl font-black">VERIFY</button>
+            </div>
+        </div>
+
+        <!-- Home: Matches -->
+        <div id="screen-home" class="space-y-6 animate-slide-up">
+            <div id="match-list" class="space-y-6">
+                <!-- Matches Inject Here -->
+            </div>
+        </div>
+
+        <!-- Lobby: Chat -->
+        <div id="screen-lobby" class="hidden space-y-4 h-[70vh] flex flex-col animate-slide-up">
+            <h2 class="text-2xl font-black italic uppercase">Global Lobby</h2>
+            <div id="chat-messages" class="flex-1 overflow-y-auto space-y-3 pr-2 hide-scrollbar">
+                <!-- Chat Inject Here -->
+            </div>
+            <div class="flex gap-2 bg-white/5 p-2 rounded-2xl border border-white/10">
+                <input id="chat-input" placeholder="Type message..." class="bg-transparent flex-1 outline-none px-2 font-bold text-sm">
+                <button onclick="sendChatMessage()" class="bg-orange-600 p-3 rounded-xl">
+                    <i data-lucide="send" class="w-4 h-4"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Settings: Profile -->
+        <div id="screen-settings" class="hidden space-y-6 animate-slide-up pb-12">
+            <h2 id="admin-trigger" class="text-2xl font-black italic uppercase flex items-center gap-2 cursor-pointer">
+                <i data-lucide="settings" class="text-orange-500"></i> PROFILE
+            </h2>
+            <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 text-center space-y-4 orange-glow">
+                <div class="relative w-32 h-32 mx-auto">
+                    <img id="profile-pic" src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=200" class="w-32 h-32 rounded-3xl border-4 border-orange-600/20 object-cover" alt="P">
+                    <div class="absolute -bottom-2 -right-2 bg-orange-600 px-2 py-1 rounded-lg text-[10px] font-black">PRO</div>
+                </div>
+                <h4 id="profile-name" class="font-black text-2xl text-orange-500 uppercase italic">@GAMER</h4>
+                <div class="grid grid-cols-2 gap-2 text-[10px] font-black uppercase">
+                    <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                        <p class="text-gray-500">Level</p>
+                        <p id="profile-level" class="text-white">1</p>
+                    </div>
+                    <div class="bg-white/5 p-3 rounded-xl border border-white/5">
+                        <p class="text-gray-500">XP</p>
+                        <p id="profile-xp" class="text-white">10</p>
+                    </div>
+                </div>
+                <div class="bg-white/5 p-4 rounded-2xl border border-white/5 flex justify-between items-center">
+                    <div class="text-left">
+                        <p class="text-[8px] text-gray-500 font-bold">REFERRAL CODE</p>
+                        <p id="ref-code" class="text-sm font-black text-orange-500 tracking-widest">---</p>
+                    </div>
+                    <button onclick="copyReferral()" class="p-2 bg-orange-600/20 text-orange-500 rounded-lg">
+                        <i data-lucide="copy" class="w-4 h-4"></i>
+                    </button>
+                </div>
+                <button onclick="handleLogout()" class="w-full bg-red-600/10 text-red-500 py-4 rounded-2xl font-black border border-red-600/20">LOGOUT</button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Navigation -->
+    <nav id="bottom-nav" class="fixed bottom-6 inset-x-6 h-20 glass rounded-[2.5rem] flex items-center justify-around px-3 z-50 hidden">
+        <button onclick="switchTab('home')" id="nav-home" class="nav-btn flex flex-col items-center gap-1 tab-active">
+            <i data-lucide="trophy" class="w-6 h-6"></i>
+            <span class="text-[8px] font-black uppercase italic">Home</span>
+        </button>
+        <button onclick="switchTab('lobby')" id="nav-lobby" class="nav-btn flex flex-col items-center gap-1 text-gray-500">
+            <i data-lucide="message-square" class="w-6 h-6"></i>
+            <span class="text-[8px] font-black uppercase italic">Lobby</span>
+        </button>
+        <button onclick="switchTab('settings')" id="nav-settings" class="nav-btn flex flex-col items-center gap-1 text-gray-500">
+            <i data-lucide="settings" class="w-6 h-6"></i>
+            <span class="text-[8px] font-black uppercase italic">Profile</span>
+        </button>
+    </nav>
+
+    <!-- Modals -->
+    <div id="modal-overlay" class="fixed inset-0 bg-black/95 z-[100] flex items-center justify-center p-8 hidden">
+        <!-- Join Modal -->
+        <div id="modal-join" class="bg-[#0c0c0c] border border-orange-600/20 p-8 rounded-[3rem] w-full max-w-sm space-y-6 hidden animate-slide-up">
+            <div class="text-center">
+                <h3 id="join-title" class="text-xl font-black italic uppercase">MATCH NAME</h3>
+                <p id="join-fee" class="text-xs text-orange-500 font-bold">FEE: ₹0</p>
+            </div>
+            <div class="space-y-4">
+                <input id="join-ign" placeholder="In-Game Name (IGN)" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none font-bold">
+                <input id="join-uid" placeholder="Game UID" class="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white outline-none font-bold">
+            </div>
+            <button onclick="confirmJoin()" id="btn-join-final" class="w-full bg-orange-600 py-4 rounded-xl font-black text-white">CONFIRM JOIN</button>
+            <button onclick="closeModals()" class="w-full text-gray-500 font-bold text-xs uppercase">Back</button>
+        </div>
+        
+        <!-- Admin Modal (Secret) -->
+        <div id="modal-admin" class="bg-[#0c0c0c] border border-green-600/20 p-8 rounded-[3rem] w-full max-w-sm space-y-4 hidden">
+            <h3 class="text-xl font-black italic text-green-500">ADMIN UNLOCKED</h3>
+            <div class="space-y-2">
+                <button onclick="adminAction('create')" class="w-full bg-white/5 p-3 rounded-xl text-left font-bold text-xs uppercase">+ Create Match</button>
+                <button onclick="adminAction('alert')" class="w-full bg-white/5 p-3 rounded-xl text-left font-bold text-xs uppercase">Send Global Alert</button>
+            </div>
+            <button onclick="closeModals()" class="w-full text-gray-500 font-bold text-xs">Close</button>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, onAuthStateChanged, signInWithPhoneNumber, RecaptchaVerifier, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, onSnapshot, collection, addDoc, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFunctions, httpsCallable } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-functions.js";
+
+        // CONFIG (Replace with your actual Firebase config)
         const firebaseConfig = {
   apiKey: "AIzaSyDPChNIAQz0gEmsuDFpACl0XvWm-DNcf2k",
   authDomain: "eliteweb-5b512.firebaseapp.com",
@@ -41,854 +184,240 @@
   measurementId: "G-9HZY4280CY"
 };
 
-        const geminiApiKey = "YOUR_GEMINI_KEY";
-        firebase.initializeApp(firebaseConfig);
-        const auth = firebase.auth();
-        const db = firebase.firestore();
-        const appId = "ff-tournament-pro-final";
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const functions = getFunctions(app);
+        const appId = "elite_pro_final_v3";
 
         // Global State
-        let state = {
-            user: null, userData: null, view: 'login', activeTab: 'home',
-            matches: [], chatMessages: [], winners: [], notifications: [],
-            isDarkMode: true, isAdminUnlocked: false, isStaffUnlocked: false
+        let user = null;
+        let userData = null;
+        let confirmationResult = null;
+        let selectedMatch = null;
+        let adminTapCount = 0;
+
+        // AUTH LOGIC
+        window.sendOTP = async () => {
+            const phone = document.getElementById('auth-phone').value;
+            if(phone.length < 10) return showToast("Invalid Number", "error");
+            
+            loadingBtn('btn-otp', true);
+            if(!window.recaptchaVerifier) {
+                window.recaptchaVerifier = new RecaptchaVerifier(auth, 'recaptcha-container', { 'size': 'invisible' });
+            }
+
+            try {
+                confirmationResult = await signInWithPhoneNumber(auth, `+91${phone}`, window.recaptchaVerifier);
+                document.getElementById('auth-step-1').classList.add('hidden');
+                document.getElementById('auth-step-2').classList.remove('hidden');
+                showToast("OTP Sent!");
+            } catch (err) {
+                showToast("Error sending SMS", "error");
+            } finally { loadingBtn('btn-otp', false, "GET OTP"); }
         };
 
-        // --- AUTH CHECK ---
-        auth.onAuthStateChanged(user => {
-            if (user) {
-                state.user = user;
-                state.view = 'app';
-                startDataListeners(user.uid);
+        window.verifyOTP = async () => {
+            const otp = document.getElementById('auth-otp').value;
+            loadingBtn('btn-verify', true);
+            try {
+                await confirmationResult.confirm(otp);
+                showToast("Verified!");
+            } catch (err) {
+                showToast("Invalid OTP", "error");
+            } finally { loadingBtn('btn-verify', false, "VERIFY"); }
+        };
+
+        window.handleLogout = () => signOut(auth).then(() => showToast("Logged Out"));
+
+        // REAL-TIME SYNC
+        onAuthStateChanged(auth, (u) => {
+            user = u;
+            document.getElementById('loading-screen').classList.add('hidden');
+            
+            if(user) {
+                document.getElementById('screen-auth').classList.add('hidden');
+                document.getElementById('bottom-nav').classList.remove('hidden');
+                syncProfile();
+                syncMatches();
+                syncChat();
+                syncAlerts();
             } else {
-                state.view = 'login';
-                render();
+                document.getElementById('screen-auth').classList.remove('hidden');
+                document.getElementById('bottom-nav').classList.add('hidden');
             }
         });
 
-        async function handleRegister(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            if (f.get('pass') !== f.get('confirmPass')) return alert("Passwords don't match!");
-            
-            try {
-                // Email provider required for password logic
-                const email = `${f.get('phone')}@elite.com`;
-                const res = await auth.createUserWithEmailAndPassword(email, f.get('pass'));
-                await db.collection('artifacts').doc(appId).collection('users').doc(res.user.uid).collection('profile').doc('data').set({
-                    username: f.get('phone'), balance: 100, role: 'user', uid: res.user.uid, 
-                    totalWins: 0, joinedMatches: [], inviteCode: f.get('invite')
-                });
-            } catch (err) { alert(err.message); }
-        }
+        const syncProfile = () => {
+            const profileRef = doc(db, 'artifacts', appId, 'users', user.uid, 'profile', 'data');
+            onSnapshot(profileRef, (ds) => {
+                if(ds.exists()) {
+                    userData = ds.data();
+                    updateProfileUI();
+                }
+            });
+        };
 
-        async function handleLogin(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            try {
-                await auth.signInWithEmailAndPassword(`${f.get('phone')}@elite.com`, f.get('pass'));
-            } catch (err) { alert("Login Error: Make sure number/pass is correct."); }
-        }
-
-        function startDataListeners(uid) {
-            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data')
-                .onSnapshot(doc => { if(doc.exists()) state.userData = doc.data(); render(); });
-            
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
-                .onSnapshot(snap => { state.matches = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); });
-
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat')
-                .onSnapshot(snap => { 
-                    state.chatMessages = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.timestamp - b.timestamp).slice(-50);
-                    render();
-                });
-        }
-
-        // --- UI RENDERING (ORIGINAL ELITE DARK STYLE) ---
-        function render() {
-            const root = document.getElementById('app');
-            if (state.view === 'login' || state.view === 'register') {
-                root.innerHTML = renderAuthView();
-            } else {
-                root.innerHTML = renderAppView();
-            }
-            lucide.createIcons();
-        }
-
-        function renderAuthView() {
-            const isLogin = state.view === 'login';
-            return `
-            <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in bg-[#05050a]">
-                <div class="w-20 h-20 bg-orange-600 rounded-[2.2rem] flex items-center justify-center mb-6 shadow-2xl rotate-12">
-                    <i data-lucide="gamepad-2" class="w-12 h-12 text-white"></i>
-                </div>
-                <h1 class="text-4xl font-black italic uppercase mb-2 text-orange-600">${isLogin ? 'ELITE LOGIN' : 'CREATE SQUAD'}</h1>
-                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-12 italic">Join the Arena</p>
-                
-                <form onsubmit="${isLogin ? 'handleLogin(event)' : 'handleRegister(event)'}" class="w-full max-w-sm space-y-4">
-                    <div class="relative">
-                        <i data-lucide="smartphone" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
-                        <input name="phone" type="tel" placeholder="Phone Number" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                    </div>
-                    <div class="relative">
-                        <i data-lucide="lock" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
-                        <input name="pass" type="password" placeholder="Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                    </div>
-                    ${!isLogin ? `
-                        <div class="relative">
-                            <i data-lucide="shield-check" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
-                            <input name="confirmPass" type="password" placeholder="Confirm Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        </div>
-                        <div class="relative">
-                            <i data-lucide="user-plus" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
-                            <input name="invite" type="text" placeholder="Invite code (Optional)" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        </div>
-                    ` : ''}
-                    <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs active:scale-95 shadow-xl shadow-orange-600/20 transition-all">
-                        ${isLogin ? 'ENTER ARENA' : 'JOIN SQUAD'}
-                    </button>
-                </form>
-                <button onclick="state.view='${isLogin ? 'register' : 'login'}'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">
-                    ${isLogin ? 'New Survivor? Register' : 'Already have account? Login'}
-                </button>
-            </div>`;
-        }
-
-        function renderAppView() {
-            return `
-            <div class="min-h-screen pb-32 bg-[#05050a] text-white">
-                <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="zap" class="text-orange-600 w-5 h-5 fill-orange-600"></i>
-                        <h1 class="font-black italic text-lg uppercase tracking-tighter">ELITE APP</h1>
-                    </div>
-                    <div class="px-4 py-1.5 rounded-2xl flex items-center gap-2 text-xs font-black bg-white/5 border border-white/10 shadow-sm">
-                        <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹${state.userData?.balance || 0}
-                    </div>
-                </header>
-
-                <main class="pt-24 px-6 max-w-lg mx-auto">
-                    ${renderTabContent()}
-                </main>
-
-                <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl overflow-x-auto no-scrollbar">
-                    <button onclick="state.activeTab='home'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='home' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="trophy" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Home</span></button>
-                    <button onclick="state.activeTab='lobby'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='lobby' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="message-square" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Lobby</span></button>
-                    <button onclick="state.activeTab='match'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='match' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="gamepad-2" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Match</span></button>
-                    <button onclick="state.activeTab='settings'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='settings' ? 'text-orange-500' : 'text-gray-500'}"><i data-lucide="settings" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Profile</span></button>
-                </nav>
-            </div>`;
-        }
-
-        function renderTabContent() {
-            if (state.activeTab === 'home') {
-                return `
-                <div class="space-y-8 animate-in">
-                    <div class="relative h-48 w-full rounded-[2.5rem] overflow-hidden shadow-2xl border border-white/5 bg-black">
-                        <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800" class="w-full h-full object-cover opacity-60" />
-                        <div class="absolute inset-0 bg-gradient-to-t from-black flex flex-col justify-end p-8">
-                            <h2 class="text-2xl font-black italic uppercase text-white tracking-tighter">Grand Scrims</h2>
-                            <p class="text-[10px] font-bold opacity-80 uppercase text-white italic">Elite Squads Only</p>
-                        </div>
-                    </div>
-                    <div class="space-y-4">
-                        <h4 class="font-black text-[10px] uppercase italic text-gray-500 tracking-widest flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-orange-500"></i> LIVE TOURNAMENTS</h4>
-                        ${state.matches.map(m => `
-                            <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] relative border-l-4 border-l-orange-600 shadow-xl backdrop-blur-md">
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="text-[9px] font-black uppercase text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full">${m.map}</span>
-                                    <span class="text-[9px] text-gray-500 font-bold italic">${m.time}</span>
-                                </div>
-                                <h5 class="text-xl font-black italic uppercase">${m.title}</h5>
-                                <div class="mt-5 flex justify-between items-center">
-                                    <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Prize</p><p class="text-green-500 text-sm italic">₹${m.prizePool}</p></div>
-                                    <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg active:scale-95">JOIN ARENA</button>
-                                </div>
+        const syncMatches = () => {
+            const matchesRef = collection(db, 'artifacts', appId, 'public', 'data', 'matches');
+            onSnapshot(matchesRef, (snap) => {
+                const list = document.getElementById('match-list');
+                const matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                list.innerHTML = matches.map(m => `
+                    <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem] border-l-4 border-l-orange-600 relative overflow-hidden group">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h5 class="text-xl font-black italic uppercase leading-tight">${m.title}</h5>
+                                <p class="text-[10px] font-bold text-gray-500 uppercase mt-1">Map: ${m.map || 'Bermuda'} | Mode: ${m.mode || 'Solo'}</p>
                             </div>
-                        `).join('')}
-                    </div>
-                </div>`;
-            }
-            if (state.activeTab === 'lobby') {
-                return `
-                <div class="h-[70vh] flex flex-col animate-in">
-                    <h2 class="text-2xl font-black italic uppercase flex items-center gap-2 mb-4"><i data-lucide="message-square" class="text-orange-500"></i> GLOBAL LOBBY</h2>
-                    <div class="flex-1 bg-black/40 border border-white/5 rounded-[2.5rem] p-4 flex flex-col overflow-hidden relative backdrop-blur-xl">
-                        <div class="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4 px-2">
-                            ${state.chatMessages.map(msg => `
-                                <div class="flex items-end gap-3 ${msg.uid === state.user?.uid ? 'flex-row-reverse' : ''}">
-                                    <div class="max-w-[75%] p-3 rounded-2xl ${msg.uid === state.user?.uid ? 'bg-orange-600 text-white rounded-br-sm' : 'bg-white/10 text-gray-200 rounded-bl-sm border border-white/5'}">
-                                        <p class="text-[8px] font-black uppercase text-orange-400 mb-1 italic">${msg.username}</p>
-                                        <p class="text-xs font-medium">${msg.text}</p>
+                            <div class="bg-green-600/20 text-green-500 px-3 py-1 rounded-xl text-[10px] font-black italic">₹${m.prizePool} PRIZE</div>
+                        </div>
+                        <div class="mt-6 flex justify-between items-end">
+                            <div class="flex flex-col gap-1">
+                                <span class="text-[8px] font-black text-gray-500 uppercase">ENTRY FEE: ₹${m.entryFee}</span>
+                                <div class="flex items-center gap-2">
+                                    <div class="w-32 h-1.5 bg-white/5 rounded-full overflow-hidden">
+                                        <div class="h-full bg-orange-600" style="width: ${(m.joinedCount/m.maxPlayers)*100}%"></div>
                                     </div>
+                                    <span class="text-[9px] font-black">${m.joinedCount}/${m.maxPlayers}</span>
                                 </div>
-                            `).join('')}
-                        </div>
-                    </div>
-                </div>`;
-            }
-            if (state.activeTab === 'settings') {
-                return `
-                <div class="space-y-6 animate-in pb-12 text-center">
-                    <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-6 shadow-2xl backdrop-blur-md">
-                        <div class="w-32 h-32 rounded-[2.8rem] bg-orange-600/20 mx-auto flex items-center justify-center border-4 border-orange-600/30 shadow-2xl">
-                            <i data-lucide="user" class="w-16 h-16 text-orange-500"></i>
-                        </div>
-                        <h4 class="font-black text-2xl italic uppercase text-orange-500">@${state.userData?.username || 'GAMER'}</h4>
-                        <div class="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
-                            <div class="flex items-center justify-between">
-                                <h5 class="font-black text-[10px] uppercase italic text-gray-400">WALLET</h5>
-                                <span class="text-2xl font-black text-green-500 italic">₹${state.userData?.balance || 0}</span>
                             </div>
+                            <button onclick="openJoinModal('${m.id}', '${m.title}', ${m.entryFee})" class="px-8 py-2.5 bg-orange-600 rounded-xl text-xs font-black italic shadow-lg shadow-orange-600/20 active:scale-90 transition-all">JOIN</button>
                         </div>
-                        <button onclick="auth.signOut()" class="w-full bg-red-600/10 border border-red-600/20 text-red-500 py-6 rounded-2xl font-black uppercase text-[10px] italic shadow-xl transition-all active:scale-95">TERMINATE SESSION</button>
                     </div>
-                </div>`;
-            }
-            return `<div class="py-20 text-center text-gray-600 font-black italic">ARENA UNDER CONSTRUCTION...</div>`;
-        }
+                `).join('');
+            });
+        };
 
-    </script>
-</body>
-</html>
-        function initDataListeners(uid) {
-            // Profile
-            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data')
-                .onSnapshot(doc => { if(doc.exists()) state.userData = doc.data(); render(); });
-            // Public Matches
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
-                .onSnapshot(snap => { state.matches = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); });
-            // Chat
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat')
-                .onSnapshot(snap => { 
-                    state.chatMessages = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.timestamp - b.timestamp).slice(-50);
-                    render();
-                });
-            // Config & Notify
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('settings')
-                .onSnapshot(doc => { if(doc.exists()) state.appConfig = doc.data(); render(); });
-        }
+        const syncChat = () => {
+            const chatRef = collection(db, 'artifacts', appId, 'public', 'data', 'chat');
+            onSnapshot(chatRef, (snap) => {
+                const container = document.getElementById('chat-messages');
+                const messages = snap.docs.map(d => d.data()).sort((a,b) => a.timestamp - b.timestamp).slice(-30);
+                container.innerHTML = messages.map(m => `
+                    <div class="bg-white/5 p-3 rounded-2xl border border-white/5 animate-slide-up">
+                        <p class="text-[8px] font-black text-orange-500 uppercase">${m.username}</p>
+                        <p class="text-xs font-medium text-gray-200 mt-1">${m.text}</p>
+                    </div>
+                `).join('');
+                container.scrollTop = container.scrollHeight;
+            });
+        };
 
-        // --- HANDLERS ---
-        async function handleRegister(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            if(f.get('pass') !== f.get('confirmPass')) return alert("Password match nahi kar rahe!");
-            try {
-                const res = await auth.createUserWithEmailAndPassword(`${f.get('phone')}@elite.com`, f.get('pass'));
-                await db.collection('artifacts').doc(appId).collection('users').doc(res.user.uid).collection('profile').doc('data').set({
-                    username: f.get('phone'), balance: 100, role: 'user', uid: res.user.uid, totalWins: 0, joinedMatches: [], inviteCode: f.get('invite')
-                });
-            } catch (err) { alert(err.message); }
-        }
+        const syncAlerts = () => {
+            const alertsRef = collection(db, 'artifacts', appId, 'public', 'data', 'alerts');
+            onSnapshot(alertsRef, (snap) => {
+                const latest = snap.docs.map(d => d.data()).sort((a,b) => b.timestamp - a.timestamp)[0];
+                if(latest && latest.timestamp > Date.now() - 300000) {
+                    document.getElementById('global-alert-container').classList.remove('hidden');
+                    document.getElementById('alert-text').innerText = latest.msg;
+                    setTimeout(() => document.getElementById('global-alert-container').classList.add('hidden'), 5000);
+                }
+            });
+        };
 
-        async function handleLogin(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            try {
-                await auth.signInWithEmailAndPassword(`${f.get('phone')}@elite.com`, f.get('pass'));
-            } catch (err) { alert("Login failed! Check number/password."); }
-        }
-
-        // --- MAIN RENDER ---
-        function render() {
-            const root = document.getElementById('app');
-            if (state.loading) return;
-
-            if (state.view === 'login') {
-                root.innerHTML = renderLogin();
-            } else if (state.view === 'register') {
-                root.innerHTML = renderRegister();
-            } else {
-                root.innerHTML = renderApp();
-            }
+        // UI ACTIONS
+        window.switchTab = (tab) => {
+            document.querySelectorAll('#app-screens > div').forEach(d => d.classList.add('hidden'));
+            document.getElementById(`screen-${tab}`).classList.remove('hidden');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('tab-active'));
+            document.getElementById(`nav-${tab}`).classList.add('tab-active');
             lucide.createIcons();
-        }
+        };
 
-        function renderLogin() {
-            return `
-            <div class="min-h-screen bg-white flex flex-col animate-in text-gray-800">
-                <div class="bg-gradient-to-b from-red-500 to-red-600 p-10 pb-16 text-white relative">
-                    <button class="absolute top-6 left-6"><i data-lucide="chevron-left"></i></button>
-                    <div class="flex flex-col items-center mt-4">
-                        <div class="bg-white p-2 rounded-xl mb-4"><i data-lucide="zap" class="text-red-600 w-8 h-8 fill-red-600"></i></div>
-                        <h1 class="text-3xl font-black italic">Daman</h1>
-                    </div>
-                    <div class="mt-8">
-                        <h2 class="text-2xl font-bold">Log in</h2>
-                        <p class="text-xs opacity-80 mt-1">Please log in with your phone number or email</p>
-                    </div>
-                </div>
-                <div class="flex-1 bg-gray-50 -mt-8 rounded-t-[2.5rem] p-8 space-y-6">
-                    <div class="flex border-b border-gray-200">
-                        <button class="flex-1 pb-4 border-b-2 border-red-500 text-red-500 font-bold flex flex-col items-center gap-1">
-                            <i data-lucide="smartphone" class="w-5 h-5"></i> phone number
-                        </button>
-                        <button class="flex-1 pb-4 text-gray-400 font-bold flex flex-col items-center gap-1">
-                            <i data-lucide="mail" class="w-5 h-5"></i> Email Login
-                        </button>
-                    </div>
-                    <form onsubmit="handleLogin(event)" class="space-y-6">
-                        <div class="space-y-2">
-                            <label class="flex items-center gap-2 text-sm font-bold"><i data-lucide="smartphone" class="w-4 h-4 text-red-500"></i> Phone number</label>
-                            <div class="flex gap-2">
-                                <div class="bg-white border border-gray-200 p-4 rounded-xl text-gray-400 flex items-center gap-1">+91 <i data-lucide="chevron-down" class="w-4 h-4"></i></div>
-                                <input name="phone" placeholder="Please enter the phone number" required class="flex-1 bg-white border border-gray-200 p-4 rounded-xl outline-none" />
-                            </div>
-                        </div>
-                        <div class="space-y-2">
-                            <label class="flex items-center gap-2 text-sm font-bold"><i data-lucide="lock" class="w-4 h-4 text-red-500"></i> Password</label>
-                            <div class="relative">
-                                <input name="pass" type="password" placeholder="Password" required class="w-full bg-white border border-gray-200 p-4 rounded-xl outline-none" />
-                                <i data-lucide="eye-off" class="absolute right-4 top-4 text-gray-300"></i>
-                            </div>
-                        </div>
-                        <div class="flex items-center gap-2 text-xs text-gray-400">
-                            <div class="w-4 h-4 rounded-full border border-red-500 bg-red-500 flex items-center justify-center"><i data-lucide="check" class="w-3 h-3 text-white"></i></div>
-                            Remember password
-                        </div>
-                        <button type="submit" class="w-full bg-red-500 text-white font-bold py-4 rounded-full shadow-lg shadow-red-200">Log in</button>
-                        <button type="button" onclick="state.view='register'; render();" class="w-full border border-red-500 text-red-500 font-bold py-4 rounded-full">Register</button>
-                    </form>
-                </div>
-            </div>`;
-        }
+        const updateProfileUI = () => {
+            document.getElementById('user-balance').innerText = userData.balance || 0;
+            document.getElementById('profile-name').innerText = `@${userData.username}`;
+            document.getElementById('profile-xp').innerText = userData.xp || 0;
+            document.getElementById('profile-level').innerText = Math.floor((userData.xp || 0) / 10) + 1;
+            document.getElementById('ref-code').innerText = userData.referralCode || user.uid.slice(0,6).toUpperCase();
+        };
 
-        function renderRegister() {
-            return `
-            <div class="min-h-screen bg-white flex flex-col animate-in text-gray-800">
-                <div class="bg-gradient-to-b from-red-500 to-red-600 p-10 pb-16 text-white text-center">
-                    <h1 class="text-3xl font-black italic mt-4">Daman</h1>
-                    <p class="text-sm font-bold mt-4">Register your phone</p>
-                </div>
-                <div class="flex-1 bg-gray-50 -mt-8 rounded-t-[2.5rem] p-8 space-y-4">
-                    <form onsubmit="handleRegister(event)" class="space-y-4">
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-gray-600 ml-1">Phone number</label>
-                            <div class="flex gap-2">
-                                <div class="bg-white border border-gray-200 px-3 py-4 rounded-xl text-xs">+91 <i data-lucide="chevron-down" class="inline w-3 h-3"></i></div>
-                                <input name="phone" placeholder="Please enter the phone number" required class="flex-1 bg-white border border-gray-200 p-4 rounded-xl outline-none text-sm" />
-                            </div>
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-gray-600 ml-1">Set password</label>
-                            <input name="pass" type="password" placeholder="Set password" required class="w-full bg-white border border-gray-200 p-4 rounded-xl outline-none text-sm" />
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-gray-600 ml-1">Confirm password</label>
-                            <input name="confirmPass" type="password" placeholder="Confirm password" required class="w-full bg-white border border-gray-200 p-4 rounded-xl outline-none text-sm" />
-                        </div>
-                        <div class="space-y-1">
-                            <label class="text-xs font-bold text-gray-600 ml-1">Invite code</label>
-                            <input name="invite" placeholder="Please enter the invitation code" class="w-full bg-white border border-gray-200 p-4 rounded-xl outline-none text-sm" />
-                        </div>
-                        <div class="flex items-center gap-2 text-[10px] text-gray-400">
-                            <div class="w-4 h-4 rounded-full border border-gray-200"></div>
-                            I have read and agree <span class="text-red-500">【Privacy Agreement】</span>
-                        </div>
-                        <button type="submit" class="w-full bg-red-600 text-white font-bold py-4 rounded-full shadow-lg shadow-red-200 uppercase tracking-widest mt-4">Register</button>
-                        <button type="button" onclick="state.view='login'; render();" class="w-full py-4 text-xs font-bold text-gray-400">I have an account <span class="text-red-500 ml-2">Login</span></button>
-                    </form>
-                </div>
-            </div>`;
-        }
-
-        function renderApp() {
-            return `
-            <div class="min-h-screen pb-32 transition-all">
-                <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="zap" class="text-orange-600 w-5 h-5 fill-orange-600"></i>
-                        <h1 class="font-black italic text-lg uppercase tracking-tighter">ELITE APP</h1>
-                    </div>
-                    <div class="px-4 py-1.5 rounded-2xl flex items-center gap-2 text-xs font-black bg-white/5 border border-white/10">
-                        <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹${state.userData?.balance || 0}
-                    </div>
-                </header>
-
-                <main class="pt-24 px-6 max-w-lg mx-auto">
-                    ${renderActiveTab()}
-                </main>
-
-                <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl overflow-x-auto no-scrollbar">
-                    <button onclick="state.activeTab='home'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='home' ? 'text-orange-500 -translate-y-2' : 'text-gray-500'}"><i data-lucide="trophy" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Home</span></button>
-                    <button onclick="state.activeTab='lobby'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='lobby' ? 'text-orange-500 -translate-y-2' : 'text-gray-500'}"><i data-lucide="message-square" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Lobby</span></button>
-                    <button onclick="state.activeTab='match'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='match' ? 'text-orange-500 -translate-y-2' : 'text-gray-500'}"><i data-lucide="gamepad-2" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Match</span></button>
-                    <button onclick="state.activeTab='settings'; render()" class="flex flex-col items-center gap-1 ${state.activeTab==='settings' ? 'text-orange-500 -translate-y-2' : 'text-gray-500'}"><i data-lucide="settings" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Profile</span></button>
-                </nav>
-            </div>`;
-        }
-
-        function renderActiveTab() {
-            if(state.activeTab === 'home') return renderHome();
-            if(state.activeTab === 'lobby') return renderLobby();
-            if(state.activeTab === 'match') return renderMatch();
-            if(state.activeTab === 'settings') return renderSettings();
-        }
-
-        // --- SUB-VIEWS (तेरे 1000 लाइन वाले फीचर्स का लॉजिक यहाँ है) ---
-        function renderHome() {
-            return `
-            <div class="space-y-8 animate-in">
-                <div class="relative h-48 w-full rounded-[2.5rem] overflow-hidden shadow-2xl bg-black">
-                    <img src="${state.appConfig?.bannerLink || 'https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800'}" class="w-full h-full object-cover opacity-60" />
-                    <div class="absolute inset-0 bg-gradient-to-t from-black flex flex-col justify-end p-8">
-                        <h2 class="text-2xl font-black italic uppercase text-white tracking-tighter">Grand Scrims</h2>
-                        <p class="text-[10px] font-bold opacity-80 uppercase text-white italic">Elite Squads Only</p>
-                    </div>
-                </div>
-                <div class="space-y-4">
-                    <h4 class="font-black text-[10px] uppercase italic text-gray-500 tracking-widest flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-orange-500"></i> LIVE TOURNAMENTS</h4>
-                    ${state.matches.map(m => `
-                        <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] relative border-l-4 border-l-orange-600 shadow-xl backdrop-blur-md">
-                            <div class="flex justify-between items-center mb-2">
-                                <span class="text-[9px] font-black uppercase text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full border border-orange-500/20">${m.map}</span>
-                                <span class="text-[9px] text-gray-500 font-bold italic">${m.time}</span>
-                            </div>
-                            <h5 class="text-xl font-black italic uppercase">${m.title}</h5>
-                            <div class="mt-5 flex justify-between items-center">
-                                <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Prize</p><p class="text-green-500 text-sm italic">₹${m.prizePool}</p></div>
-                                <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Slots</p><p class="text-sm italic">${m.joinedCount}/${m.totalSlots || 48}</p></div>
-                                <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg active:scale-95">JOIN ARENA</button>
-                            </div>
-                        </div>
-                    `).join('')}
-                </div>
-            </div>`;
-        }
-
-        function renderLobby() {
-            return `
-            <div class="h-[75vh] flex flex-col animate-in">
-                <h2 class="text-2xl font-black italic uppercase flex items-center gap-2 mb-4"><i data-lucide="message-square" class="text-orange-500"></i> GLOBAL LOBBY</h2>
-                <div class="flex-1 bg-black/40 border border-white/5 rounded-[2.5rem] p-4 flex flex-col overflow-hidden relative backdrop-blur-xl">
-                    <div class="flex-1 overflow-y-auto no-scrollbar space-y-4 pb-4 px-2">
-                        ${state.chatMessages.map(msg => `
-                            <div class="flex items-end gap-3 ${msg.uid === state.user?.uid ? 'flex-row-reverse' : ''}">
-                                <div class="w-8 h-8 rounded-full bg-orange-600/20 border border-white/10 flex items-center justify-center"><i data-lucide="user" class="w-4 h-4"></i></div>
-                                <div class="max-w-[75%] p-3 rounded-2xl ${msg.uid === state.user?.uid ? 'bg-orange-600 text-white rounded-br-sm' : 'bg-white/10 text-gray-200 rounded-bl-sm border border-white/5'}">
-                                    <p class="text-[8px] font-black uppercase text-orange-400 mb-1 italic">${msg.username}</p>
-                                    <p class="text-xs font-medium">${msg.text}</p>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                    <form class="mt-2 flex gap-2">
-                        <input name="msg" placeholder="Talk tactics..." class="flex-1 bg-white/5 border border-white/10 rounded-2xl px-4 py-3 outline-none text-sm text-white focus:border-orange-500 italic" />
-                        <button class="bg-orange-600 p-3.5 rounded-2xl text-white active:scale-95 transition-transform"><i data-lucide="send" class="w-5 h-5"></i></button>
-                    </form>
-                </div>
-            </div>`;
-        }
-
-        function renderMatch() {
-            const joined = state.matches.filter(m => state.userData?.joinedMatches?.includes(m.id));
-            return `
-            <div class="animate-in space-y-6">
-                <h2 class="text-2xl font-black italic uppercase flex items-center gap-2"><i data-lucide="gamepad-2" class="text-orange-500"></i> MY REGISTRATIONS</h2>
-                <div class="space-y-4 pb-12">
-                    ${joined.map(m => `
-                        <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] space-y-5 border-l-4 border-l-green-500 shadow-2xl relative overflow-hidden">
-                            <div class="flex justify-between items-center">
-                                <h4 class="font-black text-lg uppercase italic text-orange-500">${m.title}</h4>
-                                <span class="text-[10px] font-black uppercase text-gray-500 italic">${m.time}</span>
-                            </div>
-                            <div class="p-5 bg-black/50 border border-white/5 rounded-3xl space-y-4 shadow-inner">
-                                <div class="flex justify-between items-center"><span class="text-[10px] font-black text-gray-400 uppercase">Room ID</span><span class="text-sm font-black text-white font-mono tracking-wider">${m.roomId || 'WAITING...'}</span></div>
-                                <div class="flex justify-between items-center"><span class="text-[10px] font-black text-gray-400 uppercase">Password</span><span class="text-sm font-black text-white font-mono tracking-wider">${m.roomPass || 'WAITING...'}</span></div>
-                            </div>
-                            <button class="w-full bg-purple-600/20 border border-purple-500/30 text-purple-400 py-3 rounded-2xl font-black uppercase text-[10px] italic flex items-center justify-center gap-2 active:scale-95 transition-all">
-                                <i data-lucide="bot" class="w-4 h-4"></i> Ask AI Coach ✨
-                            </button>
-                        </div>
-                    `).join('')}
-                    ${joined.length === 0 ? `<div class="text-center py-20 text-gray-500 font-black uppercase text-xs italic opacity-50">No active registrations</div>` : ''}
-                </div>
-            </div>`;
-        }
-
-        function renderSettings() {
-            return `
-            <div class="space-y-6 animate-in pb-12">
-                <h2 class="text-2xl font-black italic uppercase flex items-center gap-2"><i data-lucide="settings" class="text-orange-500"></i> MY PROFILE</h2>
-                <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-8 shadow-2xl backdrop-blur-md">
-                    <div class="flex flex-col items-center gap-4 text-center">
-                        <div class="relative group cursor-pointer">
-                            <div class="w-36 h-36 rounded-[2.8rem] bg-orange-600/20 flex items-center justify-center border-4 border-orange-600/30 shadow-2xl">
-                                <i data-lucide="user" class="w-16 h-16 text-orange-500"></i>
-                            </div>
-                        </div>
-                        <div>
-                            <h4 class="font-black text-3xl tracking-tighter italic uppercase text-orange-500">@${state.userData?.username || 'GAMER'}</h4>
-                            <p class="text-[10px] text-gray-500 font-mono font-bold mt-1 uppercase italic">ID: ${state.user?.uid}</p>
-                        </div>
-                    </div>
-                    <div class="grid grid-cols-2 gap-4">
-                        <div class="bg-black/40 p-6 rounded-[2.2rem] text-center border border-white/5 border-l-2 border-l-green-500 shadow-inner">
-                            <i data-lucide="medal" class="w-6 h-6 text-green-500 mx-auto mb-1"></i>
-                            <p class="text-[9px] font-black text-gray-500 uppercase italic">Wins</p>
-                            <p class="text-3xl font-black italic text-green-500">${state.userData?.totalWins || 0}</p>
-                        </div>
-                        <div class="bg-black/40 p-6 rounded-[2.2rem] text-center border border-white/5 border-l-2 border-l-orange-500 shadow-inner">
-                            <i data-lucide="gamepad-2" class="w-6 h-6 text-orange-500 mx-auto mb-1"></i>
-                            <p class="text-[9px] font-black text-gray-500 uppercase italic">Matches</p>
-                            <p class="text-3xl font-black italic text-orange-500">${state.userData?.joinedMatches?.length || 0}</p>
-                        </div>
-                    </div>
-                    <div class="bg-white/5 border border-white/10 rounded-3xl p-6 space-y-4 shadow-xl">
-                        <div class="flex items-center justify-between">
-                            <h5 class="font-black text-[10px] uppercase italic tracking-widest text-gray-400 flex items-center gap-2"><i data-lucide="qr-code" class="w-4 h-4 text-green-500"></i> MY WALLET</h5>
-                            <span class="text-2xl font-black text-green-500 italic">₹${state.userData?.balance || 0}</span>
-                        </div>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button class="bg-green-600/20 text-green-500 border border-green-500/30 py-3.5 rounded-xl font-black uppercase text-[10px] italic active:scale-95">ADD FUNDS</button>
-                            <button class="bg-red-600/20 text-red-500 border border-red-500/30 py-3.5 rounded-xl font-black uppercase text-[10px] italic active:scale-95">WITHDRAW</button>
-                        </div>
-                    </div>
-                    <button onclick="auth.signOut()" class="w-full bg-red-600/10 border border-red-600/20 text-red-500 py-7 rounded-[2.5rem] font-black uppercase tracking-widest text-[11px] italic flex items-center justify-center gap-3 active:scale-95 shadow-xl transition-all">
-                        <i data-lucide="log-out" class="w-5 h-5"></i> TERMINATE SESSION
-                    </button>
-                </div>
-            </div>`;
-        }
-
-    </script>
-</body>
-</html>
-
-        function startListeners(uid) {
-            [span_2](start_span)// User Profile[span_2](end_span)
-            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data')
-                .onSnapshot(doc => { if(doc.exists()) state.userData = doc.data(); render(); });
-
-            [span_3](start_span)// Matches[span_3](end_span)
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
-                .onSnapshot(snap => { state.matches = snap.docs.map(d => ({id: d.id, ...d.data()})); render(); });
-
-            [span_4](start_span)// Chat[span_4](end_span)
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('chat')
-                .onSnapshot(snap => { 
-                    state.chatMessages = snap.docs.map(d => ({id: d.id, ...d.data()})).sort((a,b) => a.timestamp - b.timestamp).slice(-50); 
-                    render(); 
-                });
-
-            [span_5](start_span)// Config[span_5](end_span)
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('config').doc('settings')
-                .onSnapshot(doc => { if(doc.exists()) state.appConfig = doc.data(); render(); });
-        }
-
-        // --- HANDLERS (Daman Style Login/Register) ---
-        async function handleRegister(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            const phone = f.get('phone');
-            const pass = f.get('pass');
-            const confirm = f.get('confirmPass');
-            const invite = f.get('invite');
-
-            if (pass !== confirm) return showToast("Passwords do not match!", "error");
-            
-            try {
-                const email = `${phone}@elite.com`; // Phone को email बना रहे हैं
-                const res = await auth.createUserWithEmailAndPassword(email, pass);
-                await db.collection('artifacts').doc(appId).collection('users').doc(res.user.uid).collection('profile').doc('data').set({
-                    username: `Gamer_${phone.slice(-4)}`,
-                    balance: 100, role: 'user', uid: res.user.uid, totalWins: 0, joinedMatches: [], inviteCode: invite
-                [span_6](start_span)});[span_6](end_span)
-            } catch (err) { showToast(err.message, "error"); }
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            try {
-                await auth.signInWithEmailAndPassword(`${f.get('phone')}@elite.com`, f.get('pass'));
-            } catch (err) { showToast("Login failed! Invalid credentials.", "error"); }
-        }
-
-        // --- UI RENDERING (The 1000 Line Logic) ---
-        function render() {
-            const root = document.getElementById('app');
-            
-            if (state.view === 'login' || state.view === 'register') {
-                root.innerHTML = renderAuthView();
-            } else {
-                root.innerHTML = renderAppView();
+        // SECRET ADMIN TRIGGER (Exactly like React file)
+        document.getElementById('admin-trigger').addEventListener('click', () => {
+            adminTapCount++;
+            if(adminTapCount >= 10) {
+                adminTapCount = 0;
+                showModal('modal-admin');
+                showToast("Admin Unlocked", "success");
             }
+        });
+
+        window.openJoinModal = (id, title, fee) => {
+            selectedMatch = { id, title, fee };
+            document.getElementById('join-title').innerText = title;
+            document.getElementById('join-fee').innerText = `FEE: ₹${fee}`;
+            showModal('modal-join');
+        };
+
+        window.confirmJoin = async () => {
+            const ign = document.getElementById('join-ign').value;
+            const uid = document.getElementById('join-uid').value;
+            if(!ign || !uid) return showToast("Enter Details", "error");
+            
+            loadingBtn('btn-join-final', true);
+            try {
+                // IMPORTANT: Production mein yahan HttpsCallable use karein
+                // Filhal functionality ke liye join function ko call karein (Logic same as React)
+                const joinFn = httpsCallable(functions, 'joinMatch');
+                const res = await joinFn({ appId, matchId: selectedMatch.id, ign, uid });
+                if(res.data.success) {
+                    showToast("Joined Successfully!");
+                    closeModals();
+                }
+            } catch (err) {
+                showToast(err.message || "Join Failed", "error");
+            } finally { loadingBtn('btn-join-final', false, "CONFIRM JOIN"); }
+        };
+
+        window.sendChatMessage = async () => {
+            const input = document.getElementById('chat-input');
+            const text = input.value.trim();
+            if(!text) return;
+            input.value = '';
+            await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'chat'), {
+                username: userData?.username || "Gamer",
+                text,
+                timestamp: Date.now()
+            });
+        };
+
+        // UTILS
+        window.showToast = (msg, type = 'success') => {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `px-6 py-4 rounded-3xl shadow-2xl bg-orange-600 text-white font-black italic text-xs mb-3 animate-slide-up transition-all pointer-events-auto`;
+            toast.innerText = msg;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.style.opacity = '0';
+                setTimeout(() => toast.remove(), 500);
+            }, 3000);
+        };
+
+        window.showModal = (id) => {
+            document.getElementById('modal-overlay').classList.remove('hidden');
+            document.querySelectorAll('#modal-overlay > div').forEach(d => d.classList.add('hidden'));
+            document.getElementById(id).classList.remove('hidden');
+        };
+
+        window.closeModals = () => document.getElementById('modal-overlay').classList.add('hidden');
+
+        const loadingBtn = (id, loading, text) => {
+            const btn = document.getElementById(id);
+            btn.disabled = loading;
+            btn.innerHTML = loading ? `<i data-lucide="loader-2" class="w-5 h-5 animate-spin mx-auto"></i>` : text;
             lucide.createIcons();
-        }
+        };
 
-        function renderAuthView() {
-            const isLogin = state.view === 'login';
-            return `
-            <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in">
-                <div class="w-20 h-20 bg-orange-600 rounded-[2.2rem] flex items-center justify-center mb-6 shadow-2xl rotate-12">
-                    <i data-lucide="gamepad-2" class="w-12 h-12 text-white"></i>
-                </div>
-                <h1 class="text-4xl font-black italic uppercase mb-2">${isLogin ? 'ELITE LOGIN' : 'JOIN SQUAD'}</h1>
-                <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-10 italic">Elite Tournaments Arena</p>
-                
-                <form onsubmit="${isLogin ? 'handleLogin(event)' : 'handleRegister(event)'}" class="w-full max-w-sm space-y-4">
-                    <div class="relative">
-                        <i data-lucide="phone" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
-                        <input name="phone" type="tel" placeholder="Phone Number" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                    </div>
-                    <div class="relative">
-                        <i data-lucide="lock" class="absolute left-4 top-5 w-5 h-5 text-gray-600"></i>
-                        <input name="pass" type="password" placeholder="${isLogin ? 'Password' : 'Set Password'}" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                    </div>
-                    ${!isLogin ? `
-                        <input name="confirmPass" type="password" placeholder="Confirm Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        <input name="invite" type="text" placeholder="Invite Code (Optional)" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                    ` : ''}
-                    <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl active:scale-95 transition-all">
-                        ${isLogin ? 'ENTER ARENA' : 'CREATE ACCOUNT'}
-                    </button>
-                </form>
-                <button onclick="state.view='${isLogin ? 'register' : 'login'}'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">
-                    ${isLogin ? 'New Survivor? Register' : 'Already have account? Login'}
-                </button>
-            </div>`;
-        }
+        window.copyReferral = () => {
+            const code = document.getElementById('ref-code').innerText;
+            navigator.clipboard.writeText(code);
+            showToast("Code Copied!");
+        };
 
-        function renderAppView() {
-            return `
-            <div class="min-h-screen pb-32">
-                <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
-                    <div class="flex items-center gap-2">
-                        <i data-lucide="zap" class="text-orange-600 w-5 h-5 fill-orange-600"></i>
-                        <h1 class="font-black italic text-lg uppercase tracking-tighter">ELITE APP</h1>
-                    </div>
-                    <div class="px-4 py-1.5 rounded-2xl flex items-center gap-2 text-xs font-black bg-white/5 border border-white/10 shadow-sm">
-                        <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹${state.userData?.balance || 0}
-                    </div>
-                </header>
-
-                <main class="pt-24 px-6 max-w-lg mx-auto">
-                    ${renderTabContent()}
-                </main>
-
-                <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl overflow-x-auto no-scrollbar">
-                    <button onclick="state.activeTab='home'; render()" class="${state.activeTab==='home' ? 'tab-active' : 'text-gray-500'} flex flex-col items-center gap-1 transition-all"><i data-lucide="trophy"></i><span class="text-[8px] font-black uppercase">Home</span></button>
-                    <button onclick="state.activeTab='lobby'; render()" class="${state.activeTab==='lobby' ? 'tab-active' : 'text-gray-500'} flex flex-col items-center gap-1 transition-all"><i data-lucide="message-square"></i><span class="text-[8px] font-black uppercase">Lobby</span></button>
-                    <button onclick="state.activeTab='match'; render()" class="${state.activeTab==='match' ? 'tab-active' : 'text-gray-500'} flex flex-col items-center gap-1 transition-all"><i data-lucide="gamepad-2"></i><span class="text-[8px] font-black uppercase">Match</span></button>
-                    <button onclick="state.activeTab='settings'; render()" class="${state.activeTab==='settings' ? 'tab-active' : 'text-gray-500'} flex flex-col items-center gap-1 transition-all"><i data-lucide="settings"></i><span class="text-[8px] font-black uppercase">Profile</span></button>
-                </nav>
-            </div>`;
-        }
-
-        function renderTabContent() {
-            if(state.activeTab === 'home') {
-                return `
-                <div class="space-y-8 animate-in">
-                    <div class="relative h-48 w-full rounded-[2.5rem] overflow-hidden shadow-2xl bg-black border border-white/5">
-                        <img src="https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&q=80&w=800" class="w-full h-full object-cover opacity-60" />
-                        <div class="absolute inset-0 bg-gradient-to-t from-black flex flex-col justify-end p-8">
-                            <h2 class="text-2xl font-black italic uppercase text-white tracking-tighter">Grand Scrims</h2>
-                            <p class="text-[10px] font-bold opacity-80 uppercase text-white italic">Elite Squads Only</p>
-                        </div>
-                    </div>
-                    <div class="space-y-4">
-                        <h4 class="font-black text-[10px] uppercase italic text-gray-500 tracking-widest flex items-center gap-2"><i data-lucide="clock" class="w-4 h-4 text-orange-500"></i> LIVE TOURNAMENTS</h4>
-                        ${state.matches.map(m => `
-                            <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] relative border-l-4 border-l-orange-600 shadow-xl">
-                                <div class="flex justify-between items-start mb-2">
-                                    <span class="text-[9px] font-black uppercase text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full">${m.map}</span>
-                                    <span class="text-[9px] text-gray-500 font-bold italic">${m.time}</span>
-                                </div>
-                                <h5 class="text-xl font-black italic uppercase">${m.title}</h5>
-                                <div class="mt-5 flex justify-between items-center">
-                                    <div class="text-[10px] font-bold text-green-500">₹${m.prizePool}</div>
-                                    <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg active:scale-95">JOIN ARENA</button>
-                                </div>
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>`;
-            }
-            if(state.activeTab === 'settings') {
-                return `
-                <div class="space-y-6 animate-in">
-                    <div class="bg-white/5 p-8 rounded-[3rem] border border-white/10 space-y-6 text-center shadow-2xl backdrop-blur-md">
-                        <div class="w-32 h-32 rounded-[2.5rem] bg-orange-600/20 mx-auto flex items-center justify-center border-4 border-orange-600/30">
-                            <i data-lucide="user" class="w-16 h-16 text-orange-500"></i>
-                        </div>
-                        <div>
-                            <h4 class="font-black text-2xl italic uppercase text-orange-500">@${state.userData?.username || 'GAMER'}</h4>
-                            <p class="text-[9px] text-gray-500 font-mono mt-1 italic">UID: ${state.user?.uid}</p>
-                        </div>
-                        <div class="grid grid-cols-2 gap-4">
-                            <div class="bg-black/40 p-5 rounded-3xl border border-white/5 border-l-2 border-l-green-500">
-                                <p class="text-[8px] text-gray-500 uppercase font-black">Wins</p>
-                                <p class="text-2xl font-black italic text-green-500">${state.userData?.totalWins || 0}</p>
-                            </div>
-                            <div class="bg-black/40 p-5 rounded-3xl border border-white/5 border-l-2 border-l-orange-500">
-                                <p class="text-[8px] text-gray-500 uppercase font-black">Matches</p>
-                                <p class="text-2xl font-black italic text-orange-500">${state.userData?.joinedMatches?.length || 0}</p>
-                            </div>
-                        </div>
-                        <button onclick="auth.signOut()" class="w-full bg-red-600/10 border border-red-600/20 text-red-500 py-5 rounded-2xl font-black uppercase text-[10px] italic flex items-center justify-center gap-2 active:scale-95 transition-all">
-                            <i data-lucide="log-out" class="w-4 h-4"></i> TERMINATE SESSION
-                        </button>
-                    </div>
-                </div>`;
-            }
-            return `<div class="py-20 text-center text-gray-500 font-black uppercase text-xs italic opacity-30">Content Coming Soon...</div>`;
-        }
-
-        // --- UTILS ---
-        function showToast(msg, type='success') {
-            alert(msg); // अभी के लिए simple alert, बाद में toast बना सकते हैं
-        }
-
+        lucide.createIcons();
     </script>
 </body>
 </html>
-            const phone = f.get('phone');
-            const pass = f.get('pass');
-            const confirmPass = f.get('confirmPass');
-            const invite = f.get('invite');
 
-            if (pass !== confirmPass) return alert("Passwords match नहीं कर रहे!");
-            
-            try {
-                // फोन नंबर को ईमेल की तरह इस्तेमाल कर रहे हैं ताकि पासवर्ड सिस्टम चले
-                const email = `${phone}@elite.com`; 
-                [span_3](start_span)[span_4](start_span)const res = await auth.createUserWithEmailAndPassword(email, pass);[span_3](end_span)[span_4](end_span)
-                
-                await db.collection('artifacts').doc(appId).collection('users').doc(res.user.uid).collection('profile').doc('data').set({
-                    username: `Gamer_${phone.slice(-4)}`,
-                    phone: phone,
-                    balance: 100,
-                    role: 'user',
-                    uid: res.user.uid,
-                    inviteCode: invite || '',
-                    totalWins: 0,
-                    joinedMatches: []
-                [span_5](start_span)});[span_5](end_span)
-            } catch (err) { alert(err.message); }
-        }
-
-        async function handleLogin(e) {
-            e.preventDefault();
-            const f = new FormData(e.target);
-            const phone = f.get('phone');
-            const pass = f.get('pass');
-            
-            try {
-                [span_6](start_span)[span_7](start_span)await auth.signInWithEmailAndPassword(`${phone}@elite.com`, pass);[span_6](end_span)[span_7](end_span)
-            } catch (err) { alert("Login failed! नंबर या पासवर्ड चेक करें।"); }
-        }
-
-        function fetchData(uid) {
-            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data').onSnapshot(doc => {
-                state.userData = doc.data();
-                render();
-            [span_8](start_span)});[span_8](end_span)
-
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches').onSnapshot(snap => {
-                state.matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                render();
-            [span_9](start_span)});[span_9](end_span)
-        }
-
-        // --- RENDERING ---
-        function render() {
-            const root = document.getElementById('app');
-            
-            if (state.view === 'login') {
-                root.innerHTML = `
-                <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in">
-                    <div class="w-20 h-20 bg-orange-600 rounded-[2.2rem] flex items-center justify-center mb-6 shadow-2xl rotate-12">
-                        <i data-lucide="gamepad-2" class="w-12 h-12 text-white"></i>
-                    </div>
-                    <h1 class="text-4xl font-black italic uppercase mb-2">ELITE LOGIN</h1>
-                    <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-12 italic">Log in with your phone number</p>
-                    
-                    <form onsubmit="handleLogin(event)" class="w-full max-w-sm space-y-4">
-                        <div class="relative">
-                            <i data-lucide="phone" class="absolute left-4 top-5 w-5 h-5 text-gray-500"></i>
-                            <input name="phone" type="tel" placeholder="Phone Number" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        </div>
-                        <div class="relative">
-                            <i data-lucide="lock" class="absolute left-4 top-5 w-5 h-5 text-gray-500"></i>
-                            <input name="pass" type="password" placeholder="Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        </div>
-                        <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl shadow-orange-600/20 active:scale-95 transition-all">ENTER ARENA</button>
-                    </form>
-                    
-                    <button onclick="state.view='register'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">New Survivor? Register Now</button>
-                </div>`;
-            } 
-            else if (state.view === 'register') {
-                root.innerHTML = `
-                <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in">
-                    <h1 class="text-3xl font-black italic uppercase mb-2">CREATE SQUAD</h1>
-                    <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-8 italic text-center">Register your phone to start</p>
-                    
-                    <form onsubmit="handleRegister(event)" class="w-full max-w-sm space-y-4">
-                        <input name="phone" type="tel" placeholder="Phone Number (+91)" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        <input name="pass" type="password" placeholder="Set Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        <input name="confirmPass" type="password" placeholder="Confirm Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        <input name="invite" type="text" placeholder="Invite Code (Optional)" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                        
-                        <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl shadow-orange-600/20 active:scale-95 transition-all">JOIN SQUAD</button>
-                    </form>
-                    
-                    <button onclick="state.view='login'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">Already a member? Login</button>
-                </div>`;
-            }
-            else {
-                // Main App UI (Same as before)
-                root.innerHTML = `
-                <div class="min-h-screen pb-32">
-                    <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
-                        <div class="flex items-center gap-2">
-                            <i data-lucide="zap" class="text-orange-600 w-5 h-5 fill-orange-600"></i>
-                            <h1 class="font-black italic text-lg uppercase tracking-tighter">ELITE APP</h1>
-                        </div>
-                        <div class="px-4 py-1.5 rounded-2xl flex items-center gap-2 text-xs font-black bg-white/5 border border-white/10 shadow-sm">
-                            <i data-lucide="wallet" class="w-3.5 h-3.5 text-green-500"></i> ₹${state.userData?.balance || 0}
-                        </div>
-                    </header>
-
-                    <main class="pt-24 px-6 max-w-lg mx-auto">
-                        <div class="space-y-8">
-                            <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem] border-l-4 border-l-orange-600 shadow-2xl">
-                                <h2 class="text-xl font-black italic uppercase">Welcome, @${state.userData?.username}</h2>
-                                <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">Status: Active Survivor</p>
-                            </div>
-
-                            <h4 class="font-black text-[10px] uppercase italic text-gray-500 tracking-widest flex items-center gap-2">
-                                <i data-lucide="clock" class="w-4 h-4 text-orange-500"></i> LIVE TOURNAMENTS
-                            </h4>
-                            
-                            <div class="space-y-4">
-                                ${state.matches.map(m => `
-                                    <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] backdrop-blur-md shadow-xl border-l-2 border-l-orange-500">
-                                        <div class="flex justify-between items-center mb-2">
-                                            <span class="text-[9px] font-black uppercase text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full">${m.map}</span>
-                                            <span class="text-[9px] text-gray-500 font-bold italic">${m.time}</span>
-                                        </div>
-                                        <h5 class="text-xl font-black italic uppercase">${m.title}</h5>
-                                        <div class="mt-5 flex justify-between items-center">
-                                            <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Prize</p><p class="text-green-500 text-sm font-mono italic">₹${m.prizePool}</p></div>
-                                            <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg active:scale-95">JOIN ARENA</button>
-                                        </div>
-                                    </div>
-                                `).join('')}
-                            </div>
-                        </div>
-                    </main>
-
-                    <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl">
-                        <button class="text-orange-500 flex flex-col items-center gap-1"><i data-lucide="trophy" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Home</span></button>
-                        <button onclick="auth.signOut()" class="text-gray-500 flex flex-col items-center gap-1"><i data-lucide="log-out" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Exit</span></button>
-                    </nav>
-                [span_10](start_span)[span_11](start_span)[span_12](start_span)[span_13](start_span)[span_14](start_span)[span_15](start_span)</div>`;[span_10](end_span)[span_11](end_span)[span_12](end_span)[span_13](end_span)[span_14](end_span)[span_15](end_span)
-            }
-            lucide.createIcons();
-        }
-    </script>
-</body>
-</html>
