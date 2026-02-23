@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite App - Surivivor Arena</title>
+    <title>Elite App - Gaming Arena</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
@@ -12,18 +12,17 @@
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; background-color: #05050a; color: white; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        .animate-pulse-slow { animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
-        @keyframes slideIn { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-in { animation: slideIn 0.4s ease-out forwards; }
+        .animate-in { animation: fadeIn 0.4s ease-out; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
     </style>
 </head>
-<body class="bg-[#05050a] text-white overflow-x-hidden">
+<body>
 
     <div id="app">
-        <div id="loading-screen" class="h-screen flex items-center justify-center text-orange-600 font-black italic tracking-widest animate-pulse">
-            CONNECTING ARENA...
+        <div class="h-screen flex items-center justify-center text-orange-600 font-black italic tracking-widest animate-pulse">
+            INITIALIZING ARENA...
         </div>
     </div>
 
@@ -39,124 +38,133 @@
   measurementId: "G-9HZY4280CY"
 };
 
-        // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
         const auth = firebase.auth();
         const db = firebase.firestore();
         const appId = "ff-tournament-pro-final";
 
-        // Global State
         let state = {
             user: null,
             userData: null,
-            view: 'login', // 'login' or 'app'
+            view: 'login', // 'login' or 'register' or 'app'
             activeTab: 'home',
-            isDarkMode: true,
-            matches: [],
-            otpSent: false,
-            confirmationResult: null
+            matches: []
         };
 
-        // --- AUTH LOGIC (OTP SYSTEM) ---
+        // --- AUTH LOGIC ---
         window.onload = () => {
             auth.onAuthStateChanged(user => {
                 if (user) {
                     state.user = user;
                     state.view = 'app';
-                    fetchUserData(user.uid);
+                    fetchData(user.uid);
                 } else {
-                    state.view = 'login';
                     render();
                 }
             });
-            setupRecaptcha();
         };
 
-        function setupRecaptcha() {
-            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-                'size': 'invisible'
-            });
-        }
+        async function handleRegister(e) {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            const phone = f.get('phone');
+            const pass = f.get('pass');
+            const confirmPass = f.get('confirmPass');
+            const invite = f.get('invite');
 
-        async function sendOTP() {
-            const phone = document.getElementById('phone-input').value;
-            try {
-                const confirmation = await auth.signInWithPhoneNumber(phone, window.recaptchaVerifier);
-                state.confirmationResult = confirmation;
-                state.otpSent = true;
-                alert("OTP Sent to " + phone);
-                render();
-            } catch (error) {
-                alert(error.message);
-            }
-        }
-
-        async function verifyOTP() {
-            const code = document.getElementById('otp-input').value;
-            try {
-                const result = await state.confirmationResult.confirm(code);
-                // New user profile setup if needed
-                const userRef = db.collection('artifacts').doc(appId).collection('users').doc(result.user.uid).collection('profile').doc('data');
-                const docSnap = await userRef.get();
-                if (!docSnap.exists()) {
-                    await userRef.set({
-                        username: "Survivor_" + result.user.uid.slice(0,4),
-                        balance: 100,
-                        role: 'user',
-                        uid: result.user.uid,
-                        totalWins: 0,
-                        joinedMatches: []
-                    });
-                }
-            } catch (error) {
-                alert("Invalid OTP!");
-            }
-        }
-
-        // --- DATA FETCHING ---
-        function fetchUserData(uid) {
-            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data')
-                .onSnapshot(doc => {
-                    state.userData = doc.data();
-                    render();
-                });
+            if (pass !== confirmPass) return alert("Passwords match नहीं कर रहे!");
             
-            // Fetch Matches
-            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches')
-                .onSnapshot(snap => {
-                    state.matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
-                    render();
-                });
+            try {
+                // फोन नंबर को ईमेल की तरह इस्तेमाल कर रहे हैं ताकि पासवर्ड सिस्टम चले
+                const email = `${phone}@elite.com`; 
+                [span_3](start_span)[span_4](start_span)const res = await auth.createUserWithEmailAndPassword(email, pass);[span_3](end_span)[span_4](end_span)
+                
+                await db.collection('artifacts').doc(appId).collection('users').doc(res.user.uid).collection('profile').doc('data').set({
+                    username: `Gamer_${phone.slice(-4)}`,
+                    phone: phone,
+                    balance: 100,
+                    role: 'user',
+                    uid: res.user.uid,
+                    inviteCode: invite || '',
+                    totalWins: 0,
+                    joinedMatches: []
+                [span_5](start_span)});[span_5](end_span)
+            } catch (err) { alert(err.message); }
         }
 
-        // --- RENDERING ENGINE ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            const f = new FormData(e.target);
+            const phone = f.get('phone');
+            const pass = f.get('pass');
+            
+            try {
+                [span_6](start_span)[span_7](start_span)await auth.signInWithEmailAndPassword(`${phone}@elite.com`, pass);[span_6](end_span)[span_7](end_span)
+            } catch (err) { alert("Login failed! नंबर या पासवर्ड चेक करें।"); }
+        }
+
+        function fetchData(uid) {
+            db.collection('artifacts').doc(appId).collection('users').doc(uid).collection('profile').doc('data').onSnapshot(doc => {
+                state.userData = doc.data();
+                render();
+            [span_8](start_span)});[span_8](end_span)
+
+            db.collection('artifacts').doc(appId).collection('public').doc('data').collection('matches').onSnapshot(snap => {
+                state.matches = snap.docs.map(d => ({id: d.id, ...d.data()}));
+                render();
+            [span_9](start_span)});[span_9](end_span)
+        }
+
+        // --- RENDERING ---
         function render() {
             const root = document.getElementById('app');
             
             if (state.view === 'login') {
                 root.innerHTML = `
                 <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in">
-                    <div id="recaptcha-container"></div>
                     <div class="w-20 h-20 bg-orange-600 rounded-[2.2rem] flex items-center justify-center mb-6 shadow-2xl rotate-12">
-                        <i data-lucide="gamepad-2" class="w-12 h-12"></i>
+                        <i data-lucide="gamepad-2" class="w-12 h-12 text-white"></i>
                     </div>
-                    <h1 class="text-4xl font-black italic uppercase mb-2">BOOYAH!</h1>
-                    <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-12 italic">Elite Tournaments</p>
+                    <h1 class="text-4xl font-black italic uppercase mb-2">ELITE LOGIN</h1>
+                    <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-12 italic">Log in with your phone number</p>
                     
-                    <div class="w-full max-w-sm space-y-4">
-                        ${!state.otpSent ? `
-                            <input id="phone-input" type="tel" placeholder="+91 0000000000" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold text-sm text-white focus:border-orange-500" />
-                            <button onclick="sendOTP()" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl">SEND OTP</button>
-                        ` : `
-                            <input id="otp-input" type="number" placeholder="Enter 6-digit OTP" class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 outline-none font-bold text-sm text-white focus:border-orange-500 text-center tracking-widest" />
-                            <button onclick="verifyOTP()" class="w-full bg-green-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl">VERIFY & ENTER</button>
-                            <button onclick="state.otpSent=false; render();" class="w-full text-gray-500 text-[10px] font-bold uppercase">Change Phone Number</button>
-                        `}
-                    </div>
+                    <form onsubmit="handleLogin(event)" class="w-full max-w-sm space-y-4">
+                        <div class="relative">
+                            <i data-lucide="phone" class="absolute left-4 top-5 w-5 h-5 text-gray-500"></i>
+                            <input name="phone" type="tel" placeholder="Phone Number" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        </div>
+                        <div class="relative">
+                            <i data-lucide="lock" class="absolute left-4 top-5 w-5 h-5 text-gray-500"></i>
+                            <input name="pass" type="password" placeholder="Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-5 pl-12 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        </div>
+                        <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl shadow-orange-600/20 active:scale-95 transition-all">ENTER ARENA</button>
+                    </form>
+                    
+                    <button onclick="state.view='register'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">New Survivor? Register Now</button>
                 </div>`;
-            } else {
+            } 
+            else if (state.view === 'register') {
                 root.innerHTML = `
-                <div class="min-h-screen ${state.isDarkMode ? 'bg-[#05050a] text-white' : 'bg-[#fafafa] text-black'} pb-32">
+                <div class="min-h-screen flex flex-col items-center justify-center p-8 animate-in">
+                    <h1 class="text-3xl font-black italic uppercase mb-2">CREATE SQUAD</h1>
+                    <p class="text-gray-500 text-[10px] font-bold uppercase tracking-[0.4em] mb-8 italic text-center">Register your phone to start</p>
+                    
+                    <form onsubmit="handleRegister(event)" class="w-full max-w-sm space-y-4">
+                        <input name="phone" type="tel" placeholder="Phone Number (+91)" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        <input name="pass" type="password" placeholder="Set Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        <input name="confirmPass" type="password" placeholder="Confirm Password" required class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        <input name="invite" type="text" placeholder="Invite Code (Optional)" class="w-full bg-white/5 border border-white/10 rounded-2xl p-4 outline-none font-bold text-sm text-white focus:border-orange-500" />
+                        
+                        <button type="submit" class="w-full bg-orange-600 text-white font-black py-5 rounded-2xl uppercase tracking-widest text-xs shadow-xl shadow-orange-600/20 active:scale-95 transition-all">JOIN SQUAD</button>
+                    </form>
+                    
+                    <button onclick="state.view='login'; render();" class="mt-8 text-orange-500 text-[10px] font-black uppercase tracking-widest italic hover:underline">Already a member? Login</button>
+                </div>`;
+            }
+            else {
+                // Main App UI (Same as before)
+                root.innerHTML = `
+                <div class="min-h-screen pb-32">
                     <header class="fixed top-0 inset-x-0 h-16 bg-black/40 backdrop-blur-xl border-b border-white/5 flex items-center justify-between px-6 z-50">
                         <div class="flex items-center gap-2">
                             <i data-lucide="zap" class="text-orange-600 w-5 h-5 fill-orange-600"></i>
@@ -168,24 +176,27 @@
                     </header>
 
                     <main class="pt-24 px-6 max-w-lg mx-auto">
-                        <div class="animate-in space-y-8 pb-10">
+                        <div class="space-y-8">
+                            <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem] border-l-4 border-l-orange-600 shadow-2xl">
+                                <h2 class="text-xl font-black italic uppercase">Welcome, @${state.userData?.username}</h2>
+                                <p class="text-[10px] text-gray-500 font-bold uppercase mt-1">Status: Active Survivor</p>
+                            </div>
+
                             <h4 class="font-black text-[10px] uppercase italic text-gray-500 tracking-widest flex items-center gap-2">
                                 <i data-lucide="clock" class="w-4 h-4 text-orange-500"></i> LIVE TOURNAMENTS
                             </h4>
-                            <div id="matches-list" class="space-y-4">
+                            
+                            <div class="space-y-4">
                                 ${state.matches.map(m => `
-                                    <div class="bg-white/5 border border-white/10 p-6 rounded-[2rem] relative border-l-4 border-l-orange-600 backdrop-blur-md shadow-2xl">
-                                        <div class="flex justify-between items-start mb-2">
+                                    <div class="bg-white/5 border border-white/10 p-6 rounded-[2.5rem] backdrop-blur-md shadow-xl border-l-2 border-l-orange-500">
+                                        <div class="flex justify-between items-center mb-2">
                                             <span class="text-[9px] font-black uppercase text-orange-500 bg-orange-500/10 px-3 py-1 rounded-full">${m.map}</span>
                                             <span class="text-[9px] text-gray-500 font-bold italic">${m.time}</span>
                                         </div>
-                                        <h5 class="text-xl font-black tracking-tight uppercase italic">${m.title}</h5>
+                                        <h5 class="text-xl font-black italic uppercase">${m.title}</h5>
                                         <div class="mt-5 flex justify-between items-center">
-                                            <div class="flex gap-4">
-                                                <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Prize</p><p class="text-green-500 text-sm font-mono italic">₹${m.prizePool}</p></div>
-                                                <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Slots</p><p class="text-sm italic">${m.joinedCount}/${m.totalSlots || 48}</p></div>
-                                            </div>
-                                            <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg">JOIN ARENA</button>
+                                            <div class="text-[10px] font-bold"><p class="text-gray-500 uppercase text-[8px]">Prize</p><p class="text-green-500 text-sm font-mono italic">₹${m.prizePool}</p></div>
+                                            <button class="px-6 py-2.5 rounded-xl bg-orange-600 text-white text-[10px] font-black uppercase shadow-lg active:scale-95">JOIN ARENA</button>
                                         </div>
                                     </div>
                                 `).join('')}
@@ -194,12 +205,10 @@
                     </main>
 
                     <nav class="fixed bottom-6 inset-x-6 h-20 bg-black/60 backdrop-blur-3xl border border-white/10 rounded-[2.5rem] flex items-center justify-around px-3 z-50 shadow-2xl">
-                        <button class="text-orange-500 flex flex-col items-center gap-1"><i data-lucide="trophy" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase">Home</span></button>
-                        <button class="text-gray-500 flex flex-col items-center gap-1"><i data-lucide="trending-up" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase">Rank</span></button>
-                        <button class="text-gray-500 flex flex-col items-center gap-1"><i data-lucide="message-square" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase">Lobby</span></button>
-                        <button onclick="auth.signOut()" class="text-red-500 flex flex-col items-center gap-1"><i data-lucide="log-out" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase">Exit</span></button>
+                        <button class="text-orange-500 flex flex-col items-center gap-1"><i data-lucide="trophy" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Home</span></button>
+                        <button onclick="auth.signOut()" class="text-gray-500 flex flex-col items-center gap-1"><i data-lucide="log-out" class="w-6 h-6"></i><span class="text-[8px] font-black uppercase italic">Exit</span></button>
                     </nav>
-                </div>`;
+                [span_10](start_span)[span_11](start_span)[span_12](start_span)[span_13](start_span)[span_14](start_span)[span_15](start_span)</div>`;[span_10](end_span)[span_11](end_span)[span_12](end_span)[span_13](end_span)[span_14](end_span)[span_15](end_span)
             }
             lucide.createIcons();
         }
